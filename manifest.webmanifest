@@ -1,0 +1,12 @@
+{
+  "name": "CONVASES Tareas",
+  "short_name": "CONVASES",
+  "description": "Gestión de tareas para CONVASES S.A. de C.V.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0c12",
+  "theme_color": "#0a0c12",
+  "lang": "es-SV"
+}
