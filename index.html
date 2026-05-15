@@ -9,6 +9,8 @@
 <meta name="theme-color" content="#0a0c12">
 <title>CONVASES · Tareas</title>
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -32,19 +34,26 @@
   --green-soft:#22c55e18;
   --red:#ef4444;
   --red-soft:#ef444418;
+  --yellow:#eab308;
+  --yellow-soft:#eab30818;
   --blue:#60a5fa;
   --blue-soft:#60a5fa18;
   --purple:#a78bfa;
   --purple-soft:#a78bfa18;
   --orange:#fb923c;
   --orange-soft:#fb923c18;
+  --gray:#9ca3af;
+  --gray-soft:#9ca3af18;
   --font-head:'Barlow Condensed',sans-serif;
   --font-body:'Inter',sans-serif;
   --font-mono:'DM Mono',monospace;
   --shadow-sm:0 1px 2px rgba(0,0,0,.3);
   --shadow-md:0 4px 14px rgba(0,0,0,.35);
   --shadow-lg:0 10px 30px rgba(0,0,0,.5);
-  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:18px;
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px;
+  --ease-spring:cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out:cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in-out:cubic-bezier(0.4, 0, 0.2, 1);
 }
 html,body{height:100%}
 body{
@@ -54,26 +63,31 @@ body{
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
   padding-bottom:env(safe-area-inset-bottom);
 }
-button{cursor:pointer;border:none;background:none;font-family:inherit;color:var(--text-0);font-size:inherit}
+button{
+  cursor:pointer;border:none;background:none;font-family:inherit;color:var(--text-0);font-size:inherit;
+  transition:transform .15s var(--ease-out),background .15s,border-color .15s,color .15s,box-shadow .15s;
+}
+button:active{transform:scale(.96)}
 input,textarea,select{
   font-family:inherit;color:var(--text-0);background:var(--bg-3);
   border:1px solid var(--border-2);border-radius:var(--r-md);font-size:14px;
-  transition:border-color .15s,background .15s;
+  transition:border-color .15s,background .15s,box-shadow .15s;
 }
-input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);background:var(--bg-elev)}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);background:var(--bg-elev);box-shadow:0 0 0 3px var(--accent-soft)}
 select option{background:var(--bg-2)}
 textarea{resize:vertical}
 
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
-@keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
+@keyframes slideUp{from{transform:translateY(40px) scale(.96);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+@keyframes slideDown{from{transform:translateY(-16px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes pop{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.06);opacity:1}100%{transform:scale(1)}}
 
 /* ============ HEADER ============ */
 #header{
   background:linear-gradient(180deg, rgba(24,28,40,.95), rgba(17,20,29,.95));
-  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  backdrop-filter:saturate(180%) blur(18px);-webkit-backdrop-filter:saturate(180%) blur(18px);
   border-bottom:1px solid var(--border-1);
   padding:12px 16px;display:flex;align-items:center;justify-content:space-between;
   position:sticky;top:0;z-index:50;
@@ -86,13 +100,17 @@ textarea{resize:vertical}
 .stat-pill{
   font-family:var(--font-mono);font-size:10px;font-weight:500;
   padding:4px 9px;border-radius:20px;border:1px solid;line-height:1;
+  transition:transform .15s var(--ease-spring);
 }
+.stat-pill:active{transform:scale(.92)}
 .sp-p{color:var(--accent);border-color:var(--accent-soft);background:var(--accent-soft)}
 .sp-b{color:var(--red);border-color:var(--red-soft);background:var(--red-soft)}
 .sp-d{color:var(--green);border-color:var(--green-soft);background:var(--green-soft)}
+.sp-ev{color:var(--orange);border-color:var(--orange);background:var(--orange-soft);cursor:pointer;animation:pop .35s var(--ease-spring)}
+.sp-ev:hover{filter:brightness(1.1)}
 .icbtn{
   width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  color:var(--text-2);border:1px solid var(--border-1);transition:all .15s;background:var(--bg-2);
+  color:var(--text-2);border:1px solid var(--border-1);background:var(--bg-2);
 }
 .icbtn:hover,.icbtn:active{color:var(--accent);border-color:var(--border-2)}
 .icbtn svg{width:16px;height:16px}
@@ -108,10 +126,7 @@ textarea{resize:vertical}
 .sdot.busy{animation:pulse .8s infinite;background:var(--accent);color:var(--accent)}
 .sdot.err{background:var(--red);color:var(--red)}
 .sdot.off{background:var(--text-3);box-shadow:none;color:var(--text-3)}
-#sync-btn{
-  color:var(--text-2);padding:3px 10px;border-radius:6px;
-  display:flex;align-items:center;gap:5px;font-family:inherit;font-size:inherit;
-}
+#sync-btn{color:var(--text-2);padding:3px 10px;border-radius:6px;display:flex;align-items:center;gap:5px}
 #sync-btn:hover:not(:disabled){color:var(--accent)}
 #sync-btn:disabled{opacity:.4;cursor:wait}
 
@@ -124,7 +139,7 @@ textarea{resize:vertical}
 .tab{
   font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:1.5px;
   padding:12px 16px;white-space:nowrap;color:var(--text-2);
-  border-bottom:2px solid transparent;transition:all .15s;cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .2s var(--ease-out);cursor:pointer;
 }
 .tab:hover{color:var(--text-1)}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
@@ -146,13 +161,28 @@ textarea{resize:vertical}
   font-family:var(--font-head);font-weight:800;font-size:13px;letter-spacing:1.5px;
   padding:0 16px;border-radius:var(--r-md);display:flex;align-items:center;gap:7px;
   height:44px;flex-shrink:0;box-shadow:0 4px 12px rgba(232,160,32,.25);
-  transition:transform .12s,box-shadow .12s;
 }
-#cap-btn:active{transform:scale(.97)}
 #cap-btn:disabled{opacity:.5;cursor:wait;box-shadow:none}
 .spin-blk{width:14px;height:14px;border:2px solid rgba(0,0,0,.2);border-top-color:#1a1106;border-radius:50%;animation:spin .7s linear infinite}
 .hint{font-family:var(--font-mono);font-size:10px;color:var(--text-3);margin-top:8px;letter-spacing:.3px}
 .err{font-family:var(--font-mono);font-size:11px;color:var(--red);margin-top:6px}
+
+/* ============ MORNING BANNER ============ */
+#mbanner{
+  margin:14px 16px 0;padding:14px 16px;border-radius:var(--r-lg);
+  background:linear-gradient(135deg, var(--yellow-soft), var(--accent-soft));
+  border:1px solid var(--yellow);
+  display:flex;align-items:center;gap:12px;
+  animation:slideDown .4s var(--ease-spring);
+}
+#mbanner.hide{display:none}
+.mb-icon{font-size:22px;flex-shrink:0}
+.mb-body{flex:1;min-width:0}
+.mb-title{font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:1.2px;color:var(--yellow);margin-bottom:2px}
+.mb-text{font-size:13px;color:var(--text-0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mb-time{font-family:var(--font-mono);font-size:11px;color:var(--text-2);margin-top:2px}
+.mb-close{color:var(--text-2);padding:4px 8px;font-size:16px;border-radius:6px;flex-shrink:0}
+.mb-close:hover{color:var(--text-0)}
 
 /* ============ KANBAN ============ */
 #kanban{display:flex;flex-direction:column;padding-bottom:120px}
@@ -160,20 +190,21 @@ textarea{resize:vertical}
 .khead{
   display:flex;align-items:center;justify-content:space-between;
   padding:14px 16px;cursor:pointer;user-select:none;
-  transition:background .12s;
+  transition:background .15s var(--ease-out);
 }
 .khead:hover{background:rgba(255,255,255,.02)}
+.khead:active{background:rgba(255,255,255,.04)}
 .klabel{display:flex;align-items:center;gap:10px;font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:1.5px}
 .kdot{width:9px;height:9px;border-radius:50%;flex-shrink:0;box-shadow:0 0 8px currentColor}
 .kcount{
   font-family:var(--font-mono);font-size:10px;color:var(--text-2);
   background:var(--bg-2);padding:2px 8px;border-radius:10px;border:1px solid var(--border-1);
 }
-.ktoggle{font-size:18px;color:var(--text-3);transition:transform .2s;font-family:'Inter',sans-serif}
+.ktoggle{font-size:18px;color:var(--text-3);transition:transform .25s var(--ease-spring);font-family:'Inter',sans-serif}
 .ktoggle.open{transform:rotate(90deg)}
 .kcards{
   padding:0 16px 14px;display:flex;flex-direction:column;gap:10px;
-  animation:fadeIn .25s ease;
+  animation:fadeIn .25s var(--ease-out);
 }
 .kempty{
   font-family:var(--font-mono);font-size:11px;color:var(--text-3);
@@ -184,37 +215,46 @@ textarea{resize:vertical}
 .card{
   background:linear-gradient(180deg, var(--bg-2), var(--bg-1));
   border:1px solid var(--border-1);border-radius:var(--r-lg);
-  padding:13px 14px;transition:all .15s;animation:fadeIn .2s ease;
+  padding:13px 14px;transition:transform .2s var(--ease-spring),border-color .15s,box-shadow .15s,background .15s;
+  animation:fadeIn .2s var(--ease-out);
   box-shadow:var(--shadow-sm);
+  touch-action:pan-y;
+  position:relative;
 }
 .card:hover{border-color:var(--border-2);box-shadow:var(--shadow-md)}
+.card:active{transform:scale(.99)}
 .card.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent-soft), var(--shadow-md)}
-.card.done{opacity:.45}
+.card.paused{border-left:3px solid var(--yellow)}
+.card.done{opacity:.55}
+.card.cancelled{opacity:.5;border-left:3px solid var(--gray)}
 .card.evp{border-left:3px solid var(--orange)}
+.card.swiping{transition:none}
 .ctop{display:flex;align-items:flex-start;gap:10px}
 .ccheck{
-  width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border-3);
+  width:22px;height:22px;border-radius:7px;border:1.5px solid var(--border-3);
   flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .15s;background:var(--bg-1);
+  cursor:pointer;background:var(--bg-1);
+  transition:all .2s var(--ease-spring);
 }
 .ccheck:hover{border-color:var(--green)}
-.ccheck.on{background:var(--green);border-color:var(--green)}
+.ccheck:active{transform:scale(.88)}
+.ccheck.on{background:var(--green);border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
 .ccheck svg{display:none}
-.ccheck.on svg{display:block}
+.ccheck.on svg{display:block;animation:pop .25s var(--ease-spring)}
 .ctitle{font-size:14px;font-weight:600;line-height:1.4;flex:1;color:var(--text-0);letter-spacing:-.1px}
-.done .ctitle{text-decoration:line-through;color:var(--text-2)}
+.done .ctitle,.cancelled .ctitle{text-decoration:line-through;color:var(--text-2)}
 .cnotes{
   font-size:12px;color:var(--text-2);margin-top:8px;line-height:1.5;
-  font-family:var(--font-mono);padding-left:30px;
+  font-family:var(--font-mono);padding-left:32px;
 }
-.cbadges{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px;padding-left:30px}
+.cbadges{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px;padding-left:32px}
 .b{
   font-family:var(--font-mono);font-size:9.5px;letter-spacing:.3px;font-weight:500;
   padding:3px 8px;border-radius:var(--r-sm);border:1px solid;line-height:1.3;
   display:inline-flex;align-items:center;gap:4px;
 }
 .bproj{color:var(--blue);border-color:#3a7bd544;background:var(--blue-soft)}
-.btool{color:var(--purple);border-color:#8b5cf644;background:var(--purple-soft)}
+.btool{font-weight:600}
 .bblock{color:var(--red);border-color:#d94f4f44;background:var(--red-soft)}
 .bdate{color:var(--text-1);border-color:var(--border-2);background:var(--bg-2)}
 .bdate.ov{color:var(--red);border-color:#d94f4f66;background:var(--red-soft)}
@@ -223,18 +263,17 @@ textarea{resize:vertical}
 .bpB{color:var(--text-3);border-color:var(--border-2)}
 .bev{color:var(--green);border-color:#22c55e44;background:var(--green-soft)}
 .bevp{color:var(--orange);border-color:#fb923c66;background:var(--orange-soft)}
-.cbtns{display:flex;gap:6px;margin-top:12px;padding-left:30px;flex-wrap:wrap}
+.btime{color:var(--yellow);border-color:#eab30866;background:var(--yellow-soft);font-weight:600}
+.bjust{color:var(--gray);border-color:var(--border-2);background:var(--bg-2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cbtns{display:flex;gap:6px;margin-top:12px;padding-left:32px;flex-wrap:wrap}
 .cbtn{
-  font-size:11px;padding:5px 11px;border-radius:var(--r-sm);
+  font-size:11px;padding:6px 12px;border-radius:var(--r-sm);
   border:1px solid var(--border-2);color:var(--text-1);background:var(--bg-2);
   font-family:var(--font-mono);letter-spacing:.3px;display:inline-flex;align-items:center;gap:5px;
-  transition:all .12s;
 }
-.cbtn:hover{border-color:var(--border-3);color:var(--text-0)}
+.cbtn:hover{border-color:var(--border-3);color:var(--text-0);background:var(--bg-3)}
 .cbtn.go{color:var(--green);border-color:#22c55e44;background:var(--green-soft)}
-.cbtn.go:hover{background:#22c55e22}
 .cbtn.stop{color:var(--red);border-color:#ef444444;background:var(--red-soft)}
-.cbtn.stop:hover{background:#ef444422}
 .cbtn.ev{color:var(--blue);border-color:#60a5fa44;background:var(--blue-soft)}
 .ctimer{
   display:inline-flex;align-items:center;gap:6px;
@@ -243,6 +282,11 @@ textarea{resize:vertical}
   background:var(--accent-soft);border:1px solid var(--accent-soft);
 }
 .ctimer .tdot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite}
+.swipe-hint{
+  position:absolute;left:14px;top:50%;transform:translateY(-50%);
+  font-size:22px;color:var(--green);opacity:0;pointer-events:none;
+  transition:opacity .15s;
+}
 
 /* ============ PROYECTO VIEW ============ */
 #proj-view{padding:14px 16px 120px}
@@ -250,7 +294,7 @@ textarea{resize:vertical}
 .pchip{
   font-family:var(--font-mono);font-size:11px;letter-spacing:.3px;
   padding:6px 13px;border-radius:18px;border:1px solid var(--border-2);
-  color:var(--text-2);background:var(--bg-2);cursor:pointer;transition:all .12s;
+  color:var(--text-2);background:var(--bg-2);cursor:pointer;
 }
 .pchip:hover{color:var(--text-0);border-color:var(--border-3)}
 .pchip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
@@ -280,6 +324,22 @@ textarea{resize:vertical}
 .bita-em{font-family:var(--font-mono);font-size:11px;color:var(--text-2);letter-spacing:.3px;white-space:nowrap}
 .bita-em.live{color:var(--accent)}
 .bita-empty{text-align:center;color:var(--text-3);font-family:var(--font-mono);font-size:11px;padding:40px 0}
+.evpend-wrap{margin-top:30px;padding-top:20px;border-top:1px solid var(--border-1)}
+.evpend-h{
+  display:flex;align-items:center;gap:8px;
+  font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:1.5px;
+  color:var(--orange);margin-bottom:12px;
+}
+.evpend-empty{font-family:var(--font-mono);font-size:11px;color:var(--text-3);font-style:italic}
+.evpend-item{
+  background:var(--bg-2);border:1px solid var(--border-1);border-left:3px solid var(--orange);
+  border-radius:var(--r-md);padding:10px 13px;margin-bottom:6px;
+  display:flex;align-items:center;gap:10px;
+}
+.evpend-info{flex:1;min-width:0}
+.evpend-t{font-size:13px;color:var(--text-0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.evpend-meta{font-family:var(--font-mono);font-size:10px;color:var(--text-2);margin-top:2px}
+.evpend-btn{padding:6px 10px;font-size:11px;color:var(--accent);border:1px solid var(--accent-soft);background:var(--accent-soft);border-radius:var(--r-sm);flex-shrink:0}
 
 /* ============ FAB ============ */
 #fab{
@@ -287,61 +347,63 @@ textarea{resize:vertical}
   background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1a1106;
   font-size:28px;font-weight:300;display:flex;align-items:center;justify-content:center;
   box-shadow:0 6px 20px rgba(232,160,32,.4), 0 0 0 1px rgba(255,255,255,.08) inset;
-  z-index:60;transition:transform .15s;
+  z-index:60;
+  transition:transform .25s var(--ease-spring), box-shadow .25s;
 }
-#fab:active{transform:scale(.95)}
+#fab:hover{transform:scale(1.06)}
+#fab:active{transform:scale(.92)}
 
 /* ============ MODAL / OVERLAY ============ */
-#moverlay,#soverlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);
+.overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.55);
+  backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);
   z-index:100;display:flex;align-items:flex-end;justify-content:center;
-  opacity:0;pointer-events:none;transition:opacity .2s;
+  opacity:0;pointer-events:none;transition:opacity .25s var(--ease-out);
 }
-#moverlay.open,#soverlay.open{opacity:1;pointer-events:all}
-#modal,#smodal{
+.overlay.open{opacity:1;pointer-events:all}
+.sheet{
   background:linear-gradient(180deg, var(--bg-1), var(--bg-0));
   border-radius:var(--r-xl) var(--r-xl) 0 0;width:100%;max-width:560px;max-height:92vh;
-  overflow-y:auto;padding:22px 18px 36px;transform:translateY(30px);transition:transform .25s;
+  overflow-y:auto;padding:22px 18px 36px;transform:translateY(40px) scale(.96);opacity:.7;
+  transition:transform .35s var(--ease-spring),opacity .25s var(--ease-out);
   border-top:1px solid var(--border-2);box-shadow:var(--shadow-lg);
   padding-bottom:calc(36px + env(safe-area-inset-bottom));
 }
-#moverlay.open #modal,#soverlay.open #smodal{transform:translateY(0)}
+.overlay.open .sheet{transform:translateY(0) scale(1);opacity:1}
 .mtitle{
   font-family:var(--font-head);font-size:20px;font-weight:800;letter-spacing:1.5px;
-  margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;
 }
-.mclose{
-  font-size:22px;color:var(--text-2);padding:4px 10px;border-radius:6px;
-  transition:color .12s;
-}
+.msub{font-family:var(--font-body);font-size:13px;color:var(--text-2);margin-bottom:18px;line-height:1.5}
+.mclose{font-size:22px;color:var(--text-2);padding:4px 10px;border-radius:6px}
 .mclose:hover{color:var(--text-0)}
 .fg{margin-bottom:14px}
 .fl{
   font-family:var(--font-mono);font-size:10px;color:var(--text-2);letter-spacing:.7px;
   margin-bottom:6px;text-transform:uppercase;font-weight:500;
 }
+.fl .req{color:var(--red);font-weight:700}
 .fi,.fta,.fs{
-  width:100%;padding:10px 12px;border-radius:var(--r-md);font-size:13px;
+  width:100%;padding:11px 13px;border-radius:var(--r-md);font-size:13px;
   background:var(--bg-2);border:1px solid var(--border-1);
 }
-.fta{min-height:74px;resize:vertical;font-family:inherit}
+.fta{min-height:80px;resize:vertical;font-family:inherit;line-height:1.5}
 .fs{appearance:none;padding-right:36px;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236e7596' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 12px center;}
 .frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .toggle{
-  display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-2);
+  display:flex;align-items:center;gap:12px;padding:11px 13px;background:var(--bg-2);
   border:1px solid var(--border-1);border-radius:var(--r-md);cursor:pointer;
-  transition:all .12s;
 }
 .toggle:hover{border-color:var(--border-2)}
 .toggle .tsw{
-  width:36px;height:20px;border-radius:10px;background:var(--bg-3);border:1px solid var(--border-2);
-  position:relative;flex-shrink:0;transition:all .15s;
+  width:38px;height:22px;border-radius:11px;background:var(--bg-3);border:1px solid var(--border-2);
+  position:relative;flex-shrink:0;transition:all .25s var(--ease-spring);
 }
 .toggle .tsw::after{
-  content:'';position:absolute;top:1px;left:1px;width:16px;height:16px;border-radius:50%;
-  background:var(--text-2);transition:all .15s;
+  content:'';position:absolute;top:1px;left:1px;width:18px;height:18px;border-radius:50%;
+  background:var(--text-2);transition:all .25s var(--ease-spring);
 }
 .toggle.on .tsw{background:var(--orange);border-color:var(--orange)}
 .toggle.on .tsw::after{left:17px;background:#fff}
@@ -361,6 +423,13 @@ textarea{resize:vertical}
   padding:13px 16px;border:1px solid #ef444444;border-radius:var(--r-md);
   color:var(--red);font-size:13px;background:var(--red-soft);
 }
+.bdanger{
+  flex:1;background:linear-gradient(135deg, var(--red), #b91c1c);color:#fff;
+  font-family:var(--font-head);font-weight:800;font-size:14px;letter-spacing:1.5px;
+  padding:13px;border-radius:var(--r-md);
+}
+.btxt{padding:13px 18px;border-radius:var(--r-md);color:var(--text-2);font-size:13px;background:transparent}
+.btxt:hover{color:var(--text-0)}
 
 /* ============ SETTINGS ============ */
 .cfg-sec{margin-bottom:24px}
@@ -375,36 +444,46 @@ textarea{resize:vertical}
   background:var(--bg-2);border:1px solid var(--border-1);
   border-radius:var(--r-md);padding:8px 10px;
 }
-.cfg-item input{
-  flex:1;background:transparent;border:none;padding:4px 6px;font-size:13px;
-}
-.cfg-item input:focus{background:var(--bg-3);border:1px solid var(--accent)}
-.cfg-del{
-  color:var(--text-3);padding:4px 8px;font-size:13px;border-radius:6px;
-  transition:color .12s;
-}
+.cfg-item input{flex:1;background:transparent;border:none;padding:4px 6px;font-size:13px}
+.cfg-item input:focus{background:var(--bg-3);border:1px solid var(--accent);box-shadow:none}
+.cfg-del{color:var(--text-3);padding:4px 8px;font-size:13px;border-radius:6px}
 .cfg-del:hover{color:var(--red)}
 .cfg-add{
   margin-top:6px;font-family:var(--font-mono);font-size:11px;color:var(--accent);
-  padding:8px;border:1px dashed var(--border-2);border-radius:var(--r-md);
+  padding:9px;border:1px dashed var(--border-2);border-radius:var(--r-md);
   background:transparent;width:100%;letter-spacing:.3px;
-  transition:all .12s;
 }
 .cfg-add:hover{border-color:var(--accent);background:var(--accent-soft)}
+
+/* ============ EVIDENCE MODAL LIST ============ */
+.evlist-proj{margin-bottom:18px}
+.evlist-ph{
+  font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:1.2px;
+  color:var(--text-1);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border-1);
+}
+.evlist-row{
+  display:flex;gap:10px;align-items:center;
+  background:var(--bg-2);border:1px solid var(--border-1);
+  border-radius:var(--r-md);padding:10px 12px;margin-bottom:6px;
+}
+.evlist-info{flex:1;min-width:0}
+.evlist-t{font-size:13px;color:var(--text-0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.evlist-l{font-family:var(--font-mono);font-size:10px;color:var(--text-2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.evlist-btn{padding:7px 12px;font-size:11px;color:var(--accent);border:1px solid var(--accent-soft);background:var(--accent-soft);border-radius:var(--r-sm);flex-shrink:0}
 
 /* ============ TOAST ============ */
 #toast{
   position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);
   background:var(--bg-elev);border:1px solid var(--border-2);border-radius:var(--r-md);
   padding:11px 20px;font-family:var(--font-mono);font-size:12px;color:var(--text-0);
-  opacity:0;transition:all .25s;z-index:300;white-space:nowrap;pointer-events:none;
+  opacity:0;transition:all .3s var(--ease-spring);z-index:300;white-space:nowrap;pointer-events:none;
   box-shadow:var(--shadow-lg);letter-spacing:.3px;
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #toast.ok{border-color:#22c55e66;color:var(--green)}
 #toast.er{border-color:#ef444466;color:var(--red)}
 
-/* ============ LOADING SCREEN ============ */
+/* ============ LOADING ============ */
 #loading{
   position:fixed;inset:0;background:var(--bg-0);z-index:500;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
@@ -416,18 +495,14 @@ textarea{resize:vertical}
 
 /* ============ RESPONSIVE ============ */
 @media (min-width:640px){
-  body{font-size:14px}
   #kanban,#proj-view,#bita-view{max-width:680px;margin:0 auto}
+  #mbanner{max-width:648px;margin-left:auto;margin-right:auto}
 }
 </style>
 </head>
 <body>
 
-<!-- LOADING -->
-<div id="loading">
-  <div class="lspin"></div>
-  <div class="llbl">CARGANDO TAREAS…</div>
-</div>
+<div id="loading"><div class="lspin"></div><div class="llbl">CARGANDO TAREAS…</div></div>
 
 <!-- HEADER -->
 <div id="header">
@@ -442,6 +517,7 @@ textarea{resize:vertical}
       <div class="stat-pill sp-p"><span id="stp">0</span> p</div>
       <div class="stat-pill sp-b"><span id="stb">0</span> b</div>
       <div class="stat-pill sp-d"><span id="std">0</span> ✓</div>
+      <div class="stat-pill sp-ev" id="ev-pill" style="display:none">📎 <span id="stev">0</span></div>
     </div>
     <button class="icbtn" id="settings-btn" title="Configuración">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -465,26 +541,34 @@ textarea{resize:vertical}
   <div class="tab" data-view="bitacora">BITÁCORA</div>
 </div>
 
-<!-- CAPTURE BAR -->
+<!-- CAPTURE -->
 <div id="capture-bar">
   <div id="cap-wrap">
-    <textarea id="cap-input" placeholder="Escribe una idea rápida y la IA la organiza… ej: llamar a Rycsa por tuberías Chalate" rows="1"></textarea>
+    <textarea id="cap-input" placeholder="Escribe una idea rápida y la IA la organiza…" rows="1"></textarea>
     <button id="cap-btn">
       <div class="spin-blk" id="cap-sp" style="display:none"></div>
       <span id="cap-lbl">+ IA</span>
     </button>
   </div>
-  <div class="hint">Ctrl+Enter para procesar · La IA asigna proyecto/prioridad/herramienta y guarda en Backlog</div>
+  <div class="hint">Ctrl+Enter para procesar · La IA asigna proyecto/prioridad/herramienta</div>
   <div class="err" id="cap-err"></div>
+</div>
+
+<!-- MORNING BANNER -->
+<div id="mbanner" class="hide">
+  <div class="mb-icon">⏸</div>
+  <div class="mb-body">
+    <div class="mb-title">RETOMÁ DONDE DEJASTE</div>
+    <div class="mb-text" id="mb-text">—</div>
+    <div class="mb-time" id="mb-time">—</div>
+  </div>
+  <button class="mb-close" id="mb-close" title="Cerrar">✕</button>
 </div>
 
 <!-- VIEWS -->
 <div id="view-kanban"><div id="kanban"></div></div>
 <div id="view-project" style="display:none">
-  <div id="proj-view">
-    <div class="pchips" id="pchips"></div>
-    <div id="ptasks"></div>
-  </div>
+  <div id="proj-view"><div class="pchips" id="pchips"></div><div id="ptasks"></div></div>
 </div>
 <div id="view-bitacora" style="display:none">
   <div id="bita-view">
@@ -493,18 +577,20 @@ textarea{resize:vertical}
       <div class="bita-total" id="bita-total">0 min</div>
     </div>
     <div id="bita-content"></div>
+    <div class="evpend-wrap">
+      <div class="evpend-h">📎 PENDIENTE DE SUBIR HOY</div>
+      <div id="evpend-content"><div class="evpend-empty">Sin evidencia pendiente.</div></div>
+    </div>
   </div>
 </div>
 
 <!-- FAB -->
 <button id="fab" title="Nueva tarea manual">+</button>
-
-<!-- TOAST -->
 <div id="toast"></div>
 
 <!-- TASK MODAL -->
-<div id="moverlay">
-  <div id="modal">
+<div id="moverlay" class="overlay">
+  <div class="sheet" id="modal">
     <div class="mtitle"><span id="mtxt">NUEVA TAREA</span><button class="mclose" id="mclose">✕</button></div>
     <div class="fg"><div class="fl">Actividad *</div><input class="fi" id="ft" placeholder="Qué hay que hacer"></div>
     <div class="fg"><div class="fl">Descripción / Notas</div><textarea class="fta" id="fd" placeholder="Contexto, detalles, referencias…"></textarea></div>
@@ -515,15 +601,7 @@ textarea{resize:vertical}
       </div>
     </div>
     <div class="fg"><div class="fl">Herramienta(s)</div><select class="fs" id="fto"></select></div>
-    <div class="fg"><div class="fl">Estado</div>
-      <select class="fs" id="fst">
-        <option value="Backlog">Backlog — pendiente de iniciar</option>
-        <option value="Esperando">Esperando — bloqueado por alguien</option>
-        <option value="Gabinete">Gabinete — CAD / Revit / Excel</option>
-        <option value="Campo">Campo / Trámite</option>
-        <option value="Completado">Completado</option>
-      </select>
-    </div>
+    <div class="fg"><div class="fl">Estado</div><select class="fs" id="fst"></select></div>
     <div class="fg" id="blkgrp" style="display:none">
       <div class="fl">Esperando a…</div>
       <select class="fs" id="fbl"></select>
@@ -534,7 +612,7 @@ textarea{resize:vertical}
     </div>
     <div class="fg">
       <div class="fl">Link de evidencia o ruta local</div>
-      <input class="fi" id="fev" placeholder="https://drive.google.com/… o D:\Proyectos\Chalate\DTP-43.dwg">
+      <input class="fi" id="fev" placeholder="https://drive.google.com/… o D:\…">
     </div>
     <div class="fg">
       <div class="toggle" id="fevp-toggle">
@@ -553,9 +631,72 @@ textarea{resize:vertical}
   </div>
 </div>
 
+<!-- CANCEL REASON MODAL -->
+<div id="coverlay" class="overlay">
+  <div class="sheet">
+    <div class="mtitle"><span>CANCELAR TAREA</span><button class="mclose" id="cclose">✕</button></div>
+    <div class="msub" id="c-task">—</div>
+    <div class="fg">
+      <div class="fl">¿Por qué se cancela? <span class="req">*</span></div>
+      <textarea class="fta" id="c-reason" placeholder="Explica el motivo: cliente canceló, cambio de alcance, prioridad menor, etc."></textarea>
+    </div>
+    <div class="mbtns">
+      <button class="btxt" id="c-back">Volver</button>
+      <button class="bdanger" id="c-save">CANCELAR TAREA</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLOSING PANEL MODAL -->
+<div id="zoverlay" class="overlay">
+  <div class="sheet">
+    <div class="mtitle"><span id="z-title">¿GENERASTE ARCHIVOS?</span><button class="mclose" id="zclose">✕</button></div>
+    <div class="msub" id="z-task">—</div>
+    <div id="z-step1">
+      <div class="msub">¿Generaste archivos o entregables en esta sesión?</div>
+      <div class="mbtns">
+        <button class="btxt" id="z-no">No</button>
+        <button class="bsave" id="z-yes">Sí</button>
+      </div>
+    </div>
+    <div id="z-step2" style="display:none">
+      <div class="fg">
+        <div class="fl">Link de Drive o ruta local (opcional)</div>
+        <input class="fi" id="z-link" placeholder="https://drive.google.com/… o D:\…">
+        <div class="hint">Si lo subís después, dejá vacío y se marca como pendiente.</div>
+      </div>
+      <div class="mbtns">
+        <button class="btxt" id="z-skip">Marcar pendiente</button>
+        <button class="bsave" id="z-savelink">GUARDAR</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SWIPE CONFIRM MODAL -->
+<div id="woverlay" class="overlay">
+  <div class="sheet">
+    <div class="mtitle"><span>MARCAR COMPLETADA</span></div>
+    <div class="msub" id="w-task">—</div>
+    <div class="mbtns">
+      <button class="btxt" id="w-no">No</button>
+      <button class="bsave" id="w-yes">SÍ, COMPLETAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- EVIDENCE LIST MODAL -->
+<div id="eoverlay" class="overlay">
+  <div class="sheet">
+    <div class="mtitle"><span>EVIDENCIA PENDIENTE</span><button class="mclose" id="eclose">✕</button></div>
+    <div class="msub">Tareas trabajadas hoy con archivos sin subir, agrupadas por proyecto.</div>
+    <div id="elist"></div>
+  </div>
+</div>
+
 <!-- SETTINGS MODAL -->
-<div id="soverlay">
-  <div id="smodal">
+<div id="soverlay" class="overlay">
+  <div class="sheet">
     <div class="mtitle"><span>CONFIGURACIÓN</span><button class="mclose" id="sclose">✕</button></div>
     <div class="cfg-sec">
       <div class="cfg-sh">PROYECTOS</div>
@@ -577,22 +718,50 @@ textarea{resize:vertical}
 
 <script>
 // =====================================================
-// CONFIG — REEMPLAZAR DESPUÉS DEL DEPLOY DEL APPS SCRIPT
+// CONFIG
 // =====================================================
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwn7v_dCQswLFE0OHVMrGXj1H9k8JsrYdhBXAFXkuZ6ZE53wjV4XHq3k7WAJgwayvEH/exec';
 const API_TOKEN  = 'cv-convases-mav-2026';
-const CACHE_KEY  = 'convases_v4_cache';
+const CACHE_KEY  = 'convases_v5_cache';
+const BANNER_KEY = 'convases_banner_dismissed';
 
 // =====================================================
-// COLUMNS
+// CONSTANTS
 // =====================================================
 const COLS = [
-  { id:'Backlog',    label:'BACKLOG',         color:'#60a5fa' },
-  { id:'Esperando',  label:'ESPERANDO',       color:'#ef4444' },
-  { id:'Gabinete',   label:'GABINETE',        color:'#a78bfa' },
-  { id:'Campo',      label:'CAMPO / TRÁMITE', color:'#fb923c' },
-  { id:'Completado', label:'COMPLETADO',      color:'#22c55e' }
+  { id:'Por iniciar', label:'POR INICIAR', color:'#60a5fa' },
+  { id:'En progreso', label:'EN PROGRESO', color:'#fb923c' },
+  { id:'En espera',   label:'EN ESPERA',   color:'#ef4444' },
+  { id:'Pausado',     label:'PAUSADO',     color:'#eab308' },
+  { id:'Cancelado',   label:'CANCELADO',   color:'#9ca3af' },
+  { id:'Completado',  label:'COMPLETADO',  color:'#22c55e' }
 ];
+
+const STATUS_OPTIONS = [
+  { v:'Por iniciar', label:'Por iniciar — pendiente de arrancar' },
+  { v:'En progreso', label:'En progreso — trabajando activamente' },
+  { v:'En espera',   label:'En espera — bloqueado por alguien' },
+  { v:'Pausado',     label:'Pausado — temporalmente detenida' },
+  { v:'Cancelado',   label:'Cancelado — no se va a hacer' },
+  { v:'Completado',  label:'Completado' }
+];
+
+const LEGACY_STATUS = {
+  'Backlog':'Por iniciar', 'Gabinete':'En progreso',
+  'Esperando':'En espera', 'Campo':'Por iniciar'
+};
+
+const TOOL_META = {
+  'AutoCAD / Civil 3D': { emoji:'📐', color:'#60a5fa', soft:'#60a5fa18', border:'#60a5fa44' },
+  'Revit':              { emoji:'🏗️', color:'#fb923c', soft:'#fb923c18', border:'#fb923c44' },
+  'Excel':              { emoji:'📊', color:'#22c55e', soft:'#22c55e18', border:'#22c55e44' },
+  'Campo presencial':   { emoji:'🦺', color:'#eab308', soft:'#eab30818', border:'#eab30844' },
+  'Gestión / Trámite':  { emoji:'📋', color:'#a78bfa', soft:'#a78bfa18', border:'#a78bfa44' },
+  'WhatsApp / Correo':  { emoji:'💬', color:'#86efac', soft:'#86efac18', border:'#86efac44' },
+  'IA':                 { emoji:'🤖', color:'#e8a020', soft:'#e8a02018', border:'#e8a02066' },
+  'Múltiple':           { emoji:'🔧', color:'#9ca3af', soft:'#9ca3af18', border:'#9ca3af44' }
+};
+const DEFAULT_TOOL = { emoji:'·', color:'#a78bfa', soft:'#a78bfa18', border:'#a78bfa44' };
 
 // =====================================================
 // STATE
@@ -601,13 +770,20 @@ const state = {
   tasks: [],
   bitacora: [],
   active: null,
+  taskTotals: {},        // { taskId: totalMinutes }
   config: { proyectos: [], herramientas: [], bloqueadores: [] },
   view: 'kanban',
   projF: 'Todos',
-  colState: {},       // {Backlog: true} cuando abierta — cerradas por defecto
+  colState: {},
   editId: null,
   timerInterval: null,
-  online: true
+  online: true,
+  // closing panel context
+  closingFor: null,      // { taskId, action: 'pause'|'complete' }
+  // pending cancel
+  cancelFor: null,       // { taskId }
+  // pending swipe confirm
+  swipeFor: null         // { taskId }
 };
 
 // =====================================================
@@ -629,17 +805,13 @@ async function api(action, payload = {}) {
 
 function setOnline(ok, msg) {
   state.online = ok;
-  const dot = $('#sdot');
-  const lbl = $('#slbl');
+  const dot = $('#sdot'); const lbl = $('#slbl');
   dot.className = 'sdot' + (ok ? '' : ' err');
   lbl.textContent = msg || (ok ? 'Conectado' : 'Sin conexión');
 }
-
 function syncBusy(busy) {
-  const dot = $('#sdot');
-  const btn = $('#sync-btn');
-  if (busy) { dot.classList.add('busy'); btn.disabled = true; }
-  else      { dot.classList.remove('busy'); btn.disabled = false; }
+  $('#sdot').classList.toggle('busy', busy);
+  $('#sync-btn').disabled = busy;
 }
 
 // =====================================================
@@ -648,41 +820,47 @@ function syncBusy(busy) {
 function saveCache() {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({
-      tasks: state.tasks, config: state.config, bitacora: state.bitacora, active: state.active,
-      savedAt: Date.now()
+      tasks: state.tasks, config: state.config, bitacora: state.bitacora,
+      active: state.active, taskTotals: state.taskTotals, savedAt: Date.now()
     }));
   } catch(e) {}
 }
-
 function loadCache() {
   try {
     const r = localStorage.getItem(CACHE_KEY);
     if (!r) return false;
     const c = JSON.parse(r);
-    state.tasks = c.tasks || [];
+    state.tasks = (c.tasks || []).map(normalizeTask);
     state.config = c.config || { proyectos:[], herramientas:[], bloqueadores:[] };
     state.bitacora = c.bitacora || [];
     state.active = c.active || null;
+    state.taskTotals = c.taskTotals || {};
     return true;
   } catch(e) { return false; }
 }
 
+function normalizeTask(t) {
+  if (t.status && LEGACY_STATUS[t.status]) t.status = LEGACY_STATUS[t.status];
+  if (!t.status) t.status = 'Por iniciar';
+  return t;
+}
+
 // =====================================================
-// INIT
+// INIT / REFRESH
 // =====================================================
 async function init() {
-  // Cargar cache primero para mostrar algo rápido
   if (loadCache()) render();
   try {
     syncBusy(true);
     const data = await api('init');
-    state.tasks    = data.tasks || [];
-    state.bitacora = data.bitacora || [];
-    state.active   = data.active || null;
-    state.config   = data.config || state.config;
+    state.tasks      = (data.tasks || []).map(normalizeTask);
+    state.bitacora   = data.bitacora || [];
+    state.active     = data.active || null;
+    state.taskTotals = data.taskTotals || {};
+    state.config     = data.config || state.config;
     saveCache();
     setOnline(true, 'Sincronizado · ' + fmtTime(new Date()));
-    render();
+    render(); maybeShowMorningBanner();
   } catch(e) {
     setOnline(false, 'Sin conexión — datos en caché');
     if (!state.tasks.length) toast('No se pudo conectar: ' + e.message, 'er');
@@ -697,20 +875,18 @@ async function refresh() {
   try {
     syncBusy(true);
     const data = await api('init');
-    state.tasks    = data.tasks || [];
-    state.bitacora = data.bitacora || [];
-    state.active   = data.active || null;
-    state.config   = data.config || state.config;
+    state.tasks      = (data.tasks || []).map(normalizeTask);
+    state.bitacora   = data.bitacora || [];
+    state.active     = data.active || null;
+    state.taskTotals = data.taskTotals || {};
+    state.config     = data.config || state.config;
     saveCache();
     setOnline(true, 'Sincronizado · ' + fmtTime(new Date()));
-    render();
-    startActiveTimer();
+    render(); startActiveTimer();
   } catch(e) {
     setOnline(false, 'Sin conexión');
     toast('Error al refrescar', 'er');
-  } finally {
-    syncBusy(false);
-  }
+  } finally { syncBusy(false); }
 }
 
 // =====================================================
@@ -723,8 +899,26 @@ function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt
 function fmtDate(d) { if (!d) return ''; const s = String(d).slice(0,10); const [y,m,dy] = s.split('-'); return y && m && dy ? `${dy}/${m}/${y.slice(2)}` : s; }
 function fmtTime(d) { return d.toLocaleTimeString('es-SV', { hour:'2-digit', minute:'2-digit' }); }
 function fmtMin(m) { m = Number(m) || 0; if (m < 60) return m + ' min'; const h = Math.floor(m/60); const r = m%60; return r ? `${h}h ${r}min` : `${h}h`; }
-function todayISO() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
-function isoToday() { return new Date().toISOString().slice(0,10); }
+function isoToday() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function daysBetween(iso, now=new Date()) { return (now.getTime() - new Date(iso).getTime()) / 86400000; }
+function toolMeta(name) { return TOOL_META[name] || DEFAULT_TOOL; }
+function isTerminal(s) { return s === 'Completado' || s === 'Cancelado'; }
+function isExpired(t) {
+  if (!isTerminal(t.status)) return false;
+  const ref = t.status === 'Completado' ? t.completedAt : t.cancelledAt;
+  if (!ref) return false;
+  return daysBetween(ref) > 7;
+}
+function taskMinutes(taskId) {
+  let total = state.taskTotals[taskId] || 0;
+  if (state.active && state.active.taskId === taskId) {
+    total += elapsedMinutes(state.active.startTime);
+  }
+  return total;
+}
+function elapsedMinutes(startISO) {
+  return Math.max(0, Math.round((Date.now() - new Date(startISO).getTime()) / 60000));
+}
 
 function toast(msg, type = '') {
   const t = $('#toast');
@@ -732,6 +926,10 @@ function toast(msg, type = '') {
   t.className = 'show ' + (type || '');
   clearTimeout(toast._t);
   toast._t = setTimeout(() => t.className = '', 2500);
+}
+
+function visibleTasks() {
+  return state.tasks.filter(t => !isExpired(t));
 }
 
 // =====================================================
@@ -746,55 +944,80 @@ function render() {
 }
 
 function renderStats() {
-  $('#stp').textContent = state.tasks.filter(t => t.status !== 'Completado').length;
-  $('#stb').textContent = state.tasks.filter(t => t.status === 'Esperando').length;
-  $('#std').textContent = state.tasks.filter(t => t.status === 'Completado').length;
+  const v = visibleTasks();
+  $('#stp').textContent = v.filter(t => !isTerminal(t.status)).length;
+  $('#stb').textContent = v.filter(t => t.status === 'En espera').length;
+  $('#std').textContent = v.filter(t => t.status === 'Completado').length;
+
+  const today = isoToday();
+  const evCount = v.filter(t =>
+    t.evidencePending &&
+    ((t.updatedAt && String(t.updatedAt).slice(0,10) === today) ||
+     (t.completedAt && String(t.completedAt).slice(0,10) === today))
+  ).length;
+  const pill = $('#ev-pill');
+  if (evCount > 0) { pill.style.display = ''; $('#stev').textContent = evCount; }
+  else pill.style.display = 'none';
 }
 
 function populateSelects() {
-  const fp  = $('#fp');
-  const fto = $('#fto');
-  const fbl = $('#fbl');
+  const fp = $('#fp'), fto = $('#fto'), fbl = $('#fbl'), fst = $('#fst');
   fp.innerHTML  = '<option value="">Sin proyecto</option>' + state.config.proyectos.map(p => `<option>${esc(p.nombre)}</option>`).join('');
   fto.innerHTML = '<option value="">—</option>' + state.config.herramientas.map(h => `<option>${esc(h.nombre)}</option>`).join('');
   fbl.innerHTML = '<option value="">Seleccionar</option>' + state.config.bloqueadores.map(b => `<option>${esc(b.nombre)}</option>`).join('');
+  fst.innerHTML = STATUS_OPTIONS.map(s => `<option value="${esc(s.v)}">${esc(s.label)}</option>`).join('');
 }
 
 function cardHTML(t) {
-  const done    = t.status === 'Completado';
-  const isActive = state.active && state.active.taskId === t.id;
-  const ov      = t.dueDate && !done && String(t.dueDate).slice(0,10) < isoToday();
-  const pc      = t.priority === 'Alta' ? 'bpA' : t.priority === 'Baja' ? 'bpB' : 'bpM';
-  const evp     = done && t.evidencePending;
-  const evDone  = done && t.evidenceLink && !t.evidencePending;
+  const done       = t.status === 'Completado';
+  const cancelled  = t.status === 'Cancelado';
+  const paused     = t.status === 'Pausado';
+  const isActive   = state.active && state.active.taskId === t.id;
+  const ov         = t.dueDate && !done && !cancelled && String(t.dueDate).slice(0,10) < isoToday();
+  const pc         = t.priority === 'Alta' ? 'bpA' : t.priority === 'Baja' ? 'bpB' : 'bpM';
+  const evp        = (done || paused) && t.evidencePending;
+  const evDone     = t.evidenceLink && !t.evidencePending;
+  const total      = taskMinutes(t.id);
+  const tool       = t.tool ? toolMeta(t.tool) : null;
   const cls = ['card'];
   if (done) cls.push('done');
+  if (cancelled) cls.push('cancelled');
+  if (paused) cls.push('paused');
   if (isActive) cls.push('active');
   if (evp) cls.push('evp');
+
+  let toolBadge = '';
+  if (t.tool) {
+    toolBadge = `<span class="b btool" style="color:${tool.color};border-color:${tool.border};background:${tool.soft}">${tool.emoji} ${esc(t.tool)}</span>`;
+  }
+
   return `<div class="${cls.join(' ')}" data-id="${t.id}">
+    <div class="swipe-hint">✓</div>
     <div class="ctop">
       <div class="ccheck${done ? ' on' : ''}" data-tg="${t.id}" title="Marcar completado">
-        <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="1.5,6 4.5,9 10.5,3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="1.5,6 4.5,9 10.5,3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
       <div class="ctitle">${esc(t.title)}</div>
     </div>
     ${t.desc ? `<div class="cnotes">${esc(t.desc.substring(0,160))}${t.desc.length > 160 ? '…' : ''}</div>` : ''}
+    ${cancelled && t.justificante ? `<div class="cnotes" style="color:var(--gray);font-style:italic">✗ ${esc(t.justificante.substring(0,140))}</div>` : ''}
     <div class="cbadges">
       ${t.project ? `<span class="b bproj">${esc(t.project)}</span>` : ''}
-      ${t.tool ? `<span class="b btool">${esc(t.tool)}</span>` : ''}
+      ${toolBadge}
       ${t.blocker ? `<span class="b bblock">⏳ ${esc(t.blocker)}</span>` : ''}
       ${t.dueDate ? `<span class="b bdate${ov ? ' ov' : ''}">${ov ? '⚠ ' : ''}${fmtDate(t.dueDate)}</span>` : ''}
       <span class="b ${pc}">${t.priority || 'Media'}</span>
-      ${evp ? `<span class="b bevp">📎 Evidencia pendiente</span>` : ''}
-      ${evDone ? `<span class="b bev">📎 ${linkLabel(t.evidenceLink)}</span>` : ''}
+      ${paused && total > 0 ? `<span class="b btime">⏸ ${fmtMin(total)}</span>` : ''}
+      ${evp ? `<span class="b bevp">📎 Pendiente</span>` : ''}
+      ${evDone && (done || paused) ? `<span class="b bev">📎 ${linkLabel(t.evidenceLink)}</span>` : ''}
     </div>
     <div class="cbtns">
-      ${!done ? (isActive
+      ${!done && !cancelled ? (isActive
         ? `<button class="cbtn stop" data-stop="${t.id}">⏹ Pausar <span id="liveT-${t.id}">${liveElapsed()}</span></button>`
-        : `<button class="cbtn go" data-go="${t.id}">▶ Trabajando ahora</button>`
+        : `<button class="cbtn go" data-go="${t.id}">▶ Trabajando</button>`
       ) : ''}
       <button class="cbtn" data-ed="${t.id}">Editar</button>
-      ${t.evidenceLink ? `<button class="cbtn ev" data-link="${esc(t.evidenceLink)}">🔗 Abrir link</button>` : ''}
+      ${t.evidenceLink ? `<button class="cbtn ev" data-link="${esc(t.evidenceLink)}">🔗 Abrir</button>` : ''}
     </div>
   </div>`;
 }
@@ -804,24 +1027,28 @@ function linkLabel(link) {
   if (link.startsWith('http')) {
     try { return new URL(link).hostname.replace('www.',''); } catch(e) { return 'link'; }
   }
-  return link.split(/[\\\/]/).pop().slice(0,32);
+  return link.split(/[\\\/]/).pop().slice(0,28);
 }
 
 function renderKanban() {
   const el = $('#kanban'); el.innerHTML = '';
+  const visible = visibleTasks();
   COLS.forEach(col => {
-    const items = state.tasks.filter(t => t.status === col.id);
-    // Ordenar: prioridad Alta primero, después por dueDate, después por createdAt desc
-    items.sort((a,b) => {
-      const pa = a.priority === 'Alta' ? 0 : a.priority === 'Media' ? 1 : 2;
-      const pb = b.priority === 'Alta' ? 0 : b.priority === 'Media' ? 1 : 2;
-      if (pa !== pb) return pa - pb;
-      const da = String(a.dueDate || '9999').slice(0,10);
-      const db = String(b.dueDate || '9999').slice(0,10);
-      if (da !== db) return da < db ? -1 : 1;
-      return (b.createdAt || '').localeCompare(a.createdAt || '');
-    });
-    const open = !!state.colState[col.id]; // cerrada por defecto
+    let items = visible.filter(t => t.status === col.id);
+    if (col.id === 'Pausado') {
+      items.sort((a,b) => taskMinutes(b.id) - taskMinutes(a.id));
+    } else {
+      items.sort((a,b) => {
+        const pa = a.priority === 'Alta' ? 0 : a.priority === 'Media' ? 1 : 2;
+        const pb = b.priority === 'Alta' ? 0 : b.priority === 'Media' ? 1 : 2;
+        if (pa !== pb) return pa - pb;
+        const da = String(a.dueDate || '9999').slice(0,10);
+        const db = String(b.dueDate || '9999').slice(0,10);
+        if (da !== db) return da < db ? -1 : 1;
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
+      });
+    }
+    const open = !!state.colState[col.id];
     const d = document.createElement('div');
     d.className = 'kcol';
     d.innerHTML = `<div class="khead" data-col="${col.id}">
@@ -834,11 +1061,12 @@ function renderKanban() {
 }
 
 function renderProject() {
-  const projects = ['Todos', ...Array.from(new Set(state.tasks.map(t => t.project).filter(Boolean)))];
+  const visible = visibleTasks();
+  const projects = ['Todos', ...Array.from(new Set(visible.map(t => t.project).filter(Boolean)))];
   const ch = $('#pchips');
   ch.innerHTML = projects.map(p => `<button class="pchip${p === state.projF ? ' on' : ''}" data-p="${esc(p)}">${esc(p)}</button>`).join('');
   ch.querySelectorAll('.pchip').forEach(b => b.addEventListener('click', () => { state.projF = b.dataset.p; renderProject(); }));
-  const filtered = state.projF === 'Todos' ? state.tasks : state.tasks.filter(t => t.project === state.projF);
+  const filtered = state.projF === 'Todos' ? visible : visible.filter(t => t.project === state.projF);
   filtered.sort((a,b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const tl = $('#ptasks');
   tl.innerHTML = filtered.length
@@ -850,10 +1078,8 @@ function renderProject() {
 function renderBitacora() {
   const today = isoToday();
   const entries = (state.bitacora || []).filter(b => b.date === today);
-
   $('#bita-date').textContent = new Date().toLocaleDateString('es-SV', { weekday:'long', day:'2-digit', month:'long' }).toUpperCase();
 
-  // Total
   let totalMin = 0;
   entries.forEach(e => {
     if (e.endTime) totalMin += Number(e.minutes) || 0;
@@ -864,46 +1090,56 @@ function renderBitacora() {
   const content = $('#bita-content');
   if (!entries.length) {
     content.innerHTML = '<div class="bita-empty">No has registrado tiempo hoy.<br>Tocá ▶ en una tarea para empezar.</div>';
-    return;
+  } else {
+    const byProject = {};
+    entries.forEach(e => {
+      const p = e.project || '(sin proyecto)';
+      if (!byProject[p]) byProject[p] = { entries: [], total: 0 };
+      byProject[p].entries.push(e);
+      if (e.endTime) byProject[p].total += Number(e.minutes) || 0;
+      else if (state.active && state.active.id === e.id) byProject[p].total += elapsedMinutes(state.active.startTime);
+    });
+    content.innerHTML = Object.keys(byProject)
+      .sort((a,b) => byProject[b].total - byProject[a].total)
+      .map(p => {
+        const d = byProject[p];
+        return `<div class="bita-group">
+          <div class="bita-gh">${esc(p)}<span class="gt">${fmtMin(d.total)}</span></div>
+          ${d.entries.sort((a,b) => (b.startTime || '').localeCompare(a.startTime || '')).map(e => {
+            const live = !e.endTime && state.active && state.active.id === e.id;
+            const min = live ? elapsedMinutes(state.active.startTime) : (Number(e.minutes) || 0);
+            const start = new Date(e.startTime);
+            return `<div class="bita-entry${live ? ' live' : ''}">
+              <div class="bita-et">${esc(e.taskTitle)}</div>
+              <div class="bita-em${live ? ' live' : ''}">${fmtTime(start)}${e.endTime ? '–' + fmtTime(new Date(e.endTime)) : ' · ⏵'} · ${fmtMin(min)}</div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }).join('');
   }
 
-  // Agrupar por proyecto
-  const byProject = {};
-  entries.forEach(e => {
-    const p = e.project || '(sin proyecto)';
-    if (!byProject[p]) byProject[p] = { entries: [], total: 0 };
-    byProject[p].entries.push(e);
-    if (e.endTime) byProject[p].total += Number(e.minutes) || 0;
-    else if (state.active && state.active.id === e.id) byProject[p].total += elapsedMinutes(state.active.startTime);
-  });
-
-  content.innerHTML = Object.keys(byProject)
-    .sort((a,b) => byProject[b].total - byProject[a].total)
-    .map(p => {
-      const d = byProject[p];
-      return `<div class="bita-group">
-        <div class="bita-gh">${esc(p)}<span class="gt">${fmtMin(d.total)}</span></div>
-        ${d.entries.sort((a,b) => (b.startTime || '').localeCompare(a.startTime || '')).map(e => {
-          const live = !e.endTime && state.active && state.active.id === e.id;
-          const min = live ? elapsedMinutes(state.active.startTime) : (Number(e.minutes) || 0);
-          const start = new Date(e.startTime);
-          return `<div class="bita-entry${live ? ' live' : ''}">
-            <div class="bita-et">${esc(e.taskTitle)}</div>
-            <div class="bita-em${live ? ' live' : ''}">${fmtTime(start)}${e.endTime ? '–' + fmtTime(new Date(e.endTime)) : ' · ⏵'} · ${fmtMin(min)}</div>
-          </div>`;
-        }).join('')}
-      </div>`;
-    }).join('');
-}
-
-function elapsedMinutes(startISO) {
-  return Math.max(0, Math.round((Date.now() - new Date(startISO).getTime()) / 60000));
+  // Evidencia pendiente del día
+  const todayIds = new Set(entries.map(e => e.taskId));
+  const evp = visibleTasks().filter(t => t.evidencePending && todayIds.has(t.id));
+  const evC = $('#evpend-content');
+  if (!evp.length) {
+    evC.innerHTML = '<div class="evpend-empty">Sin evidencia pendiente.</div>';
+  } else {
+    evC.innerHTML = evp.map(t => `<div class="evpend-item">
+      <div class="evpend-info">
+        <div class="evpend-t">${esc(t.title)}</div>
+        <div class="evpend-meta">${esc(t.project || '(sin proyecto)')}${t.status ? ' · ' + esc(t.status) : ''}</div>
+      </div>
+      ${t.evidenceLink ? `<button class="evpend-btn" data-link="${esc(t.evidenceLink)}">🔗</button>` : `<button class="evpend-btn" data-ed="${t.id}">Editar</button>`}
+    </div>`).join('');
+    evC.querySelectorAll('[data-link]').forEach(b => b.addEventListener('click', () => openLink(b.dataset.link)));
+    evC.querySelectorAll('[data-ed]').forEach(b => b.addEventListener('click', () => openEdit(b.dataset.ed)));
+  }
 }
 
 function liveElapsed() {
   if (!state.active) return '';
-  const m = elapsedMinutes(state.active.startTime);
-  return fmtMin(m);
+  return fmtMin(elapsedMinutes(state.active.startTime));
 }
 
 function startActiveTimer() {
@@ -917,23 +1153,84 @@ function startActiveTimer() {
 }
 
 // =====================================================
-// CARD BINDINGS
+// CARD BINDINGS + SWIPE
 // =====================================================
 function bindCards() {
   $$('[data-tg]').forEach(e => e.addEventListener('click', ev => { ev.stopPropagation(); toggleDone(e.dataset.tg); }));
   $$('[data-ed]').forEach(e => e.addEventListener('click', ev => { ev.stopPropagation(); openEdit(e.dataset.ed); }));
   $$('[data-go]').forEach(e => e.addEventListener('click', ev => { ev.stopPropagation(); startWork(e.dataset.go); }));
-  $$('[data-stop]').forEach(e => e.addEventListener('click', ev => { ev.stopPropagation(); stopWork(); }));
-  $$('[data-link]').forEach(e => e.addEventListener('click', ev => {
-    ev.stopPropagation();
-    const link = e.dataset.link;
-    if (link.startsWith('http')) window.open(link, '_blank');
-    else { navigator.clipboard?.writeText(link); toast('Ruta copiada: ' + link, 'ok'); }
-  }));
+  $$('[data-stop]').forEach(e => e.addEventListener('click', ev => { ev.stopPropagation(); requestPause(e.dataset.stop); }));
+  $$('[data-link]').forEach(e => e.addEventListener('click', ev => { ev.stopPropagation(); openLink(e.dataset.link); }));
   $$('[data-col]').forEach(e => e.addEventListener('click', () => {
     state.colState[e.dataset.col] = !state.colState[e.dataset.col];
     renderKanban();
   }));
+  // Swipe en cards de Kanban/Proyecto, no en Cancelado/Completado
+  $$('.card').forEach(card => {
+    const id = card.dataset.id;
+    const task = state.tasks.find(t => t.id === id);
+    if (!task || isTerminal(task.status)) return;
+    attachSwipe(card, task);
+  });
+}
+
+function openLink(link) {
+  if (link.startsWith('http')) window.open(link, '_blank');
+  else if (navigator.clipboard) { navigator.clipboard.writeText(link); toast('Ruta copiada: ' + link, 'ok'); }
+}
+
+function attachSwipe(card, task) {
+  let startX = 0, startY = 0, dx = 0, dy = 0, dragging = false, locked = null;
+  const hint = card.querySelector('.swipe-hint');
+
+  function onStart(e) {
+    const touch = e.touches ? e.touches[0] : e;
+    if (e.touches && e.touches.length !== 1) return;
+    startX = touch.clientX; startY = touch.clientY;
+    dx = 0; dy = 0; dragging = true; locked = null;
+    card.classList.add('swiping');
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    const touch = e.touches ? e.touches[0] : e;
+    dx = touch.clientX - startX;
+    dy = touch.clientY - startY;
+    if (!locked) {
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        locked = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+      }
+    }
+    if (locked === 'h') {
+      if (e.cancelable) e.preventDefault();
+      const x = Math.max(0, Math.min(200, dx));
+      card.style.transform = `translateX(${x}px)`;
+      const ratio = Math.min(1, x / 120);
+      hint.style.opacity = ratio;
+      card.style.boxShadow = `inset ${ratio*4}px 0 0 0 var(--green), var(--shadow-sm)`;
+    }
+  }
+  function onEnd() {
+    if (!dragging) return;
+    const wasH = locked === 'h';
+    const x = wasH ? Math.max(0, dx) : 0;
+    dragging = false; locked = null;
+    card.classList.remove('swiping');
+    card.style.transform = '';
+    card.style.boxShadow = '';
+    hint.style.opacity = '';
+    if (wasH && x > 120) askSwipeComplete(task);
+  }
+
+  card.addEventListener('touchstart', onStart, { passive: true });
+  card.addEventListener('touchmove', onMove, { passive: false });
+  card.addEventListener('touchend', onEnd);
+  card.addEventListener('touchcancel', onEnd);
+}
+
+function askSwipeComplete(task) {
+  state.swipeFor = { taskId: task.id };
+  $('#w-task').textContent = task.title;
+  openOverlay('#woverlay');
 }
 
 // =====================================================
@@ -942,16 +1239,16 @@ function bindCards() {
 async function toggleDone(id) {
   const t = state.tasks.find(x => x.id === id);
   if (!t) return;
-  const newStatus = t.status === 'Completado' ? 'Backlog' : 'Completado';
-  await saveTask({ ...t, status: newStatus });
-  // Si se completó y hay timer activo, parar
-  if (newStatus === 'Completado' && state.active && state.active.taskId === id) {
-    await stopWork();
+  if (t.status === 'Completado') {
+    // revertir a Por iniciar
+    await saveTask({ ...t, status: 'Por iniciar', completedAt: '' });
+  } else {
+    // mostrar closing panel y completar
+    openClosingPanel(t, 'complete');
   }
 }
 
 async function saveTask(task) {
-  // optimista
   const prev = state.tasks.slice();
   const idx = state.tasks.findIndex(x => x.id === task.id);
   if (idx >= 0) state.tasks[idx] = task;
@@ -959,10 +1256,9 @@ async function saveTask(task) {
   render(); saveCache();
   try {
     const saved = await api('saveTask', { task });
-    // refrescar con datos del server
     const i = state.tasks.findIndex(x => x.id === saved.id);
-    if (i >= 0) state.tasks[i] = saved;
-    saveCache();
+    if (i >= 0) state.tasks[i] = normalizeTask(saved);
+    saveCache(); render();
   } catch (e) {
     state.tasks = prev;
     render(); saveCache();
@@ -983,17 +1279,19 @@ async function startWork(taskId) {
     syncBusy(true);
     const entry = await api('startWork', { taskId });
     state.active = entry;
-    // agregar a bitacora local si no está
     if (!state.bitacora.find(b => b.id === entry.id)) state.bitacora.push(entry);
+    // status local: si era Por iniciar/Pausado, ahora En progreso (server lo hizo también)
+    const t = state.tasks.find(x => x.id === taskId);
+    if (t && (t.status === 'Por iniciar' || t.status === 'Pausado')) t.status = 'En progreso';
     saveCache(); render(); startActiveTimer();
     toast('▶ Trabajando: ' + entry.taskTitle, 'ok');
-  } catch (e) {
-    toast('Error: ' + e.message, 'er');
-  } finally { syncBusy(false); }
+  } catch (e) { toast('Error: ' + e.message, 'er'); }
+  finally { syncBusy(false); }
 }
 
-async function stopWork() {
-  if (!state.active) return;
+// Solicitar pausa: para el timer y muestra closing panel
+async function requestPause(taskId) {
+  if (!state.active || state.active.taskId !== taskId) return;
   try {
     syncBusy(true);
     const stopped = await api('stopWork', { bitacoraId: state.active.id });
@@ -1001,11 +1299,21 @@ async function stopWork() {
     if (i >= 0) state.bitacora[i] = stopped;
     state.active = null;
     clearInterval(state.timerInterval);
-    saveCache(); render();
-    toast('⏹ Pausado · ' + fmtMin(stopped.minutes), 'ok');
-  } catch (e) {
-    toast('Error: ' + e.message, 'er');
-  } finally { syncBusy(false); }
+    // Actualizar status a Pausado
+    const t = state.tasks.find(x => x.id === taskId);
+    if (t) {
+      const updated = { ...t, status: 'Pausado' };
+      state.tasks = state.tasks.map(x => x.id === taskId ? updated : x);
+      // taskTotals incrementa
+      state.taskTotals[taskId] = (state.taskTotals[taskId] || 0) + (Number(stopped.minutes) || 0);
+      saveCache(); render();
+      // Sincronizar con server
+      api('saveTask', { task: updated }).catch(e => toast('Error al pausar: ' + e.message, 'er'));
+      toast('⏸ Pausada · ' + fmtMin(stopped.minutes), 'ok');
+      openClosingPanel(updated, 'pause');
+    }
+  } catch (e) { toast('Error: ' + e.message, 'er'); }
+  finally { syncBusy(false); }
 }
 
 // =====================================================
@@ -1019,7 +1327,7 @@ function openModal(t = null) {
   $('#fp').value  = t?.project || '';
   $('#fpr').value = t?.priority || 'Media';
   $('#fto').value = t?.tool || '';
-  $('#fst').value = t?.status || 'Backlog';
+  $('#fst').value = t?.status || 'Por iniciar';
   $('#fbl').value = t?.blocker || '';
   $('#fsi').value = t?.startDate ? String(t.startDate).slice(0,10) : '';
   $('#fdu').value = t?.dueDate   ? String(t.dueDate).slice(0,10)   : '';
@@ -1027,25 +1335,43 @@ function openModal(t = null) {
   setToggle('#fevp-toggle', !!t?.evidencePending);
   $('#mdel').style.display = t ? '' : 'none';
   chkBlocker();
-  $('#moverlay').classList.add('open');
+  openOverlay('#moverlay');
 }
 
-function closeModal() { $('#moverlay').classList.remove('open'); }
-
-function chkBlocker() { $('#blkgrp').style.display = $('#fst').value === 'Esperando' ? '' : 'none'; }
-
+function chkBlocker() { $('#blkgrp').style.display = $('#fst').value === 'En espera' ? '' : 'none'; }
 function setToggle(sel, on) {
   const el = $(sel);
-  if (on) el.classList.add('on');
-  else el.classList.remove('on');
+  el.classList.toggle('on', on);
   el.dataset.on = on ? '1' : '0';
 }
 
 async function saveModal() {
   const title = $('#ft').value.trim();
   if (!title) { toast('Falta el título', 'er'); return; }
+  const status = $('#fst').value;
   const existing = state.editId ? state.tasks.find(t => t.id === state.editId) : null;
-  const task = {
+
+  // Si cambia a Cancelado: abrir cancel modal
+  const wasCancelled = existing?.status === 'Cancelado';
+  if (status === 'Cancelado' && !wasCancelled) {
+    state.cancelFor = {
+      taskId: state.editId,
+      pendingTask: collectModalTask(title, existing)
+    };
+    $('#c-task').textContent = title;
+    $('#c-reason').value = existing?.justificante || '';
+    openOverlay('#coverlay');
+    return;
+  }
+
+  const task = collectModalTask(title, existing);
+  closeOverlay('#moverlay');
+  await saveTask(task);
+  toast(state.editId ? 'Tarea actualizada' : 'Tarea creada', 'ok');
+}
+
+function collectModalTask(title, existing) {
+  return {
     id:              state.editId || uid(),
     title,
     desc:            $('#fd').value.trim(),
@@ -1053,22 +1379,167 @@ async function saveModal() {
     priority:        $('#fpr').value,
     tool:            $('#fto').value,
     status:          $('#fst').value,
-    blocker:         $('#fst').value === 'Esperando' ? $('#fbl').value : '',
+    blocker:         $('#fst').value === 'En espera' ? $('#fbl').value : '',
     startDate:       $('#fsi').value,
     dueDate:         $('#fdu').value,
     evidenceLink:    $('#fev').value.trim(),
     evidencePending: $('#fevp-toggle').dataset.on === '1',
+    justificante:    existing?.justificante || '',
+    completedAt:     existing?.completedAt || '',
+    cancelledAt:     existing?.cancelledAt || '',
     createdAt:       existing?.createdAt || new Date().toISOString(),
     source:          existing?.source || 'manual'
   };
-  closeModal();
-  await saveTask(task);
-  toast(state.editId ? 'Tarea actualizada' : 'Tarea creada', 'ok');
 }
 
 function openEdit(id) {
   const t = state.tasks.find(x => x.id === id);
   if (t) openModal(t);
+}
+
+// =====================================================
+// CANCEL MODAL
+// =====================================================
+async function confirmCancel() {
+  const reason = $('#c-reason').value.trim();
+  if (!reason) { toast('Falta el justificante', 'er'); return; }
+  if (!state.cancelFor) return;
+  const task = { ...state.cancelFor.pendingTask, status: 'Cancelado', justificante: reason };
+  closeOverlay('#coverlay');
+  closeOverlay('#moverlay');
+  state.cancelFor = null;
+  await saveTask(task);
+  toast('Tarea cancelada', 'ok');
+}
+
+// =====================================================
+// CLOSING PANEL (post-complete / post-pause)
+// =====================================================
+function openClosingPanel(task, action) {
+  state.closingFor = { taskId: task.id, action };
+  $('#z-title').textContent = action === 'pause' ? '¿GENERASTE ARCHIVOS?' : '¿GENERASTE ARCHIVOS?';
+  $('#z-task').textContent = task.title;
+  $('#z-step1').style.display = '';
+  $('#z-step2').style.display = 'none';
+  $('#z-link').value = '';
+  openOverlay('#zoverlay');
+}
+
+async function closingNo() {
+  if (!state.closingFor) return closeOverlay('#zoverlay');
+  const { taskId, action } = state.closingFor;
+  state.closingFor = null;
+  closeOverlay('#zoverlay');
+  if (action === 'complete') {
+    const t = state.tasks.find(x => x.id === taskId);
+    if (t) await saveTask({ ...t, status: 'Completado', evidencePending: false });
+  }
+  // si action === 'pause', el status ya está Pausado, no hace falta nada más
+}
+
+function closingYes() {
+  $('#z-step1').style.display = 'none';
+  $('#z-step2').style.display = '';
+  setTimeout(() => $('#z-link').focus(), 100);
+}
+
+async function closingSave() {
+  if (!state.closingFor) return closeOverlay('#zoverlay');
+  const { taskId, action } = state.closingFor;
+  const link = $('#z-link').value.trim();
+  state.closingFor = null;
+  closeOverlay('#zoverlay');
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const evidencePending = !link; // sin link → pendiente
+  const updates = { ...t, evidenceLink: link || t.evidenceLink || '', evidencePending };
+  if (action === 'complete') updates.status = 'Completado';
+  await saveTask(updates);
+  toast(link ? 'Evidencia guardada' : 'Marcada como pendiente', 'ok');
+}
+
+// =====================================================
+// SWIPE CONFIRM
+// =====================================================
+function swipeYes() {
+  if (!state.swipeFor) return;
+  const t = state.tasks.find(x => x.id === state.swipeFor.taskId);
+  state.swipeFor = null;
+  closeOverlay('#woverlay');
+  if (t) openClosingPanel(t, 'complete');
+}
+function swipeNo() { state.swipeFor = null; closeOverlay('#woverlay'); }
+
+// =====================================================
+// EVIDENCE PILL → modal
+// =====================================================
+function openEvidenceList() {
+  const today = isoToday();
+  const items = visibleTasks().filter(t =>
+    t.evidencePending &&
+    ((t.updatedAt && String(t.updatedAt).slice(0,10) === today) ||
+     (t.completedAt && String(t.completedAt).slice(0,10) === today))
+  );
+  const byProj = {};
+  items.forEach(t => {
+    const p = t.project || '(sin proyecto)';
+    if (!byProj[p]) byProj[p] = [];
+    byProj[p].push(t);
+  });
+  const el = $('#elist');
+  if (!items.length) {
+    el.innerHTML = '<div class="evpend-empty" style="padding:20px 0">Sin evidencia pendiente hoy.</div>';
+  } else {
+    el.innerHTML = Object.keys(byProj).sort().map(p => `
+      <div class="evlist-proj">
+        <div class="evlist-ph">${esc(p)}</div>
+        ${byProj[p].map(t => `<div class="evlist-row">
+          <div class="evlist-info">
+            <div class="evlist-t">${esc(t.title)}</div>
+            ${t.evidenceLink ? `<div class="evlist-l">${esc(t.evidenceLink)}</div>` : '<div class="evlist-l">— sin link —</div>'}
+          </div>
+          ${t.evidenceLink
+            ? `<button class="evlist-btn" data-link="${esc(t.evidenceLink)}">Abrir</button>`
+            : `<button class="evlist-btn" data-ed="${t.id}">Editar</button>`}
+        </div>`).join('')}
+      </div>`).join('');
+    el.querySelectorAll('[data-link]').forEach(b => b.addEventListener('click', () => openLink(b.dataset.link)));
+    el.querySelectorAll('[data-ed]').forEach(b => b.addEventListener('click', () => {
+      closeOverlay('#eoverlay');
+      openEdit(b.dataset.ed);
+    }));
+  }
+  openOverlay('#eoverlay');
+}
+
+// =====================================================
+// MORNING BANNER
+// =====================================================
+function maybeShowMorningBanner() {
+  const today = isoToday();
+  if (localStorage.getItem(BANNER_KEY) === today) return;
+  const day = new Date().getDay(); // 0=Dom, 6=Sab
+  if (day === 0 || day === 6) return;
+  const candidates = visibleTasks().filter(t =>
+    t.status === 'Pausado' &&
+    String(t.updatedAt || '').slice(0,10) !== today
+  );
+  if (!candidates.length) return;
+  candidates.sort((a,b) => taskMinutes(b.id) - taskMinutes(a.id));
+  const top = candidates[0];
+  $('#mb-text').textContent = top.title;
+  $('#mb-time').textContent = (top.project ? top.project + ' · ' : '') + '⏸ ' + fmtMin(taskMinutes(top.id));
+  const banner = $('#mbanner');
+  banner.classList.remove('hide');
+  banner.onclick = (e) => {
+    if (e.target.id === 'mb-close') return;
+    openEdit(top.id);
+  };
+}
+
+function dismissBanner() {
+  localStorage.setItem(BANNER_KEY, isoToday());
+  $('#mbanner').classList.add('hide');
 }
 
 // =====================================================
@@ -1081,9 +1552,8 @@ async function runCapture() {
   btn.disabled = true; sp.style.display = 'block'; lbl.style.display = 'none'; err.textContent = '';
   try {
     const data = await api('parseAI', { text });
-    const newTasks = data.tasks || [];
+    const newTasks = (data.tasks || []).map(normalizeTask);
     if (!newTasks.length) throw new Error('La IA no encontró ninguna tarea');
-    // merge
     newTasks.forEach(t => {
       const i = state.tasks.findIndex(x => x.id === t.id);
       if (i >= 0) state.tasks[i] = t;
@@ -1091,29 +1561,20 @@ async function runCapture() {
     });
     saveCache(); render();
     inp.value = ''; inp.style.height = 'auto';
-    toast(`✨ ${newTasks.length} tarea${newTasks.length > 1 ? 's' : ''} en Backlog`, 'ok');
-  } catch (e) {
-    err.textContent = 'Error: ' + e.message;
-  } finally {
-    btn.disabled = false; sp.style.display = 'none'; lbl.style.display = 'block';
-  }
+    toast(`✨ ${newTasks.length} tarea${newTasks.length > 1 ? 's' : ''} en Por iniciar`, 'ok');
+  } catch (e) { err.textContent = 'Error: ' + e.message; }
+  finally { btn.disabled = false; sp.style.display = 'none'; lbl.style.display = 'block'; }
 }
 
 // =====================================================
 // SETTINGS
 // =====================================================
-function openSettings() {
-  renderSettings();
-  $('#soverlay').classList.add('open');
-}
-function closeSettings() { $('#soverlay').classList.remove('open'); }
-
+function openSettings() { renderSettings(); openOverlay('#soverlay'); }
 function renderSettings() {
   renderCfgList('proyectos', '#cfg-proyectos', state.config.proyectos);
   renderCfgList('herramientas', '#cfg-herramientas', state.config.herramientas);
   renderCfgList('bloqueadores', '#cfg-bloqueadores', state.config.bloqueadores);
 }
-
 function renderCfgList(typeKey, sel, items) {
   const el = $(sel);
   el.innerHTML = items.map(it => `
@@ -1128,10 +1589,9 @@ function renderCfgList(typeKey, sel, items) {
     row.querySelector('.cfg-del').addEventListener('click', () => deleteConfigItem(typeKey, id));
   });
 }
-
 async function updateConfigItem(typeKey, id, nombre) {
   if (!nombre.trim()) return;
-  const type = typeKey.replace(/s$/, ''); // proyectos→proyecto
+  const type = typeKey.replace(/s$/, '');
   try {
     const saved = await api('saveConfig', { type, item: { id, nombre: nombre.trim(), activo: true } });
     const arr = state.config[typeKey];
@@ -1141,9 +1601,8 @@ async function updateConfigItem(typeKey, id, nombre) {
     toast('Actualizado', 'ok');
   } catch(e) { toast('Error: ' + e.message, 'er'); }
 }
-
 async function deleteConfigItem(typeKey, id) {
-  if (!confirm('¿Eliminar este elemento? (se desactiva, no se borra del historial)')) return;
+  if (!confirm('¿Eliminar este elemento?')) return;
   const type = typeKey.replace(/s$/, '');
   try {
     await api('deleteConfig', { type, id });
@@ -1152,7 +1611,6 @@ async function deleteConfigItem(typeKey, id) {
     toast('Eliminado', 'ok');
   } catch(e) { toast('Error: ' + e.message, 'er'); }
 }
-
 async function addConfigItem(typeKey) {
   const type = typeKey.replace(/s$/, '');
   const nombre = prompt('Nombre del nuevo ' + type + ':');
@@ -1166,6 +1624,12 @@ async function addConfigItem(typeKey) {
 }
 
 // =====================================================
+// OVERLAYS
+// =====================================================
+function openOverlay(sel) { $(sel).classList.add('open'); }
+function closeOverlay(sel) { $(sel).classList.remove('open'); }
+
+// =====================================================
 // EVENT WIRING
 // =====================================================
 $('#cap-btn').addEventListener('click', runCapture);
@@ -1176,25 +1640,47 @@ $('#cap-input').addEventListener('input', function() {
 });
 
 $('#fab').addEventListener('click', () => openModal());
-$('#mclose').addEventListener('click', closeModal);
-$('#mcan').addEventListener('click', closeModal);
+$('#mclose').addEventListener('click', () => closeOverlay('#moverlay'));
+$('#mcan').addEventListener('click', () => closeOverlay('#moverlay'));
 $('#msave').addEventListener('click', saveModal);
 $('#fst').addEventListener('change', chkBlocker);
 $('#fevp-toggle').addEventListener('click', () => setToggle('#fevp-toggle', $('#fevp-toggle').dataset.on !== '1'));
-$('#moverlay').addEventListener('click', e => { if (e.target === $('#moverlay')) closeModal(); });
+$('#moverlay').addEventListener('click', e => { if (e.target === $('#moverlay')) closeOverlay('#moverlay'); });
 $('#mdel').addEventListener('click', async () => {
   if (!state.editId) return;
   if (!confirm('¿Eliminar esta tarea? (se marca como eliminada, queda en el historial)')) return;
   const id = state.editId;
-  closeModal();
+  closeOverlay('#moverlay');
   await deleteTask(id);
   toast('Tarea eliminada');
 });
 
+$('#cclose').addEventListener('click', () => { state.cancelFor = null; closeOverlay('#coverlay'); });
+$('#c-back').addEventListener('click', () => { state.cancelFor = null; closeOverlay('#coverlay'); });
+$('#c-save').addEventListener('click', confirmCancel);
+$('#coverlay').addEventListener('click', e => { if (e.target === $('#coverlay')) { state.cancelFor = null; closeOverlay('#coverlay'); } });
+
+$('#zclose').addEventListener('click', () => { state.closingFor = null; closeOverlay('#zoverlay'); });
+$('#z-no').addEventListener('click', closingNo);
+$('#z-yes').addEventListener('click', closingYes);
+$('#z-skip').addEventListener('click', () => { $('#z-link').value = ''; closingSave(); });
+$('#z-savelink').addEventListener('click', closingSave);
+$('#zoverlay').addEventListener('click', e => { if (e.target === $('#zoverlay')) closeOverlay('#zoverlay'); });
+
+$('#w-yes').addEventListener('click', swipeYes);
+$('#w-no').addEventListener('click', swipeNo);
+$('#woverlay').addEventListener('click', e => { if (e.target === $('#woverlay')) swipeNo(); });
+
+$('#eclose').addEventListener('click', () => closeOverlay('#eoverlay'));
+$('#eoverlay').addEventListener('click', e => { if (e.target === $('#eoverlay')) closeOverlay('#eoverlay'); });
+$('#ev-pill').addEventListener('click', openEvidenceList);
+
 $('#settings-btn').addEventListener('click', openSettings);
-$('#sclose').addEventListener('click', closeSettings);
-$('#soverlay').addEventListener('click', e => { if (e.target === $('#soverlay')) closeSettings(); });
+$('#sclose').addEventListener('click', () => closeOverlay('#soverlay'));
+$('#soverlay').addEventListener('click', e => { if (e.target === $('#soverlay')) closeOverlay('#soverlay'); });
 $$('.cfg-add').forEach(b => b.addEventListener('click', () => addConfigItem(b.dataset.add + 's')));
+
+$('#mb-close').addEventListener('click', e => { e.stopPropagation(); dismissBanner(); });
 
 $('#sync-btn').addEventListener('click', refresh);
 
@@ -1207,6 +1693,7 @@ $$('.tab').forEach(tab => {
     $('#view-project').style.display  = state.view === 'project'  ? '' : 'none';
     $('#view-bitacora').style.display = state.view === 'bitacora' ? '' : 'none';
     $('#capture-bar').style.display   = state.view === 'bitacora' ? 'none' : '';
+    $('#mbanner').style.display       = state.view === 'kanban'   ? '' : 'none';
     render();
   });
 });

@@ -1,17 +1,24 @@
 /**
- * CONVASES Task Manager — Apps Script backend
+ * CONVASES Task Manager — Apps Script backend (v3)
  *
- * SETUP (ver README.md):
+ * SETUP:
  *   1. Script Properties (Configuración del proyecto > Script Properties):
  *        - API_TOKEN          → token secreto compartido con el frontend
  *        - ANTHROPIC_API_KEY  → key de Anthropic (https://console.anthropic.com/settings/keys)
  *        - SHEET_ID           → 1LzjQQLFh5719qyEzpBYSYclcbuIiF3IE_MSR3XZpXxA
  *        - EMAIL_TO           → moises.vasquez999@gmail.com
- *   2. Correr una vez manualmente: setupAll() — crea hojas e instala triggers
+ *   2. Correr una vez manualmente: setupAll() — crea/migra hojas e instala triggers
  *   3. Deploy > Nueva implementación > Web app
- *        - Execute as: Me (moises.vasquez999@gmail.com)
+ *        - Execute as: Me
  *        - Who has access: Anyone
  *      Copia la URL y pégala en index.html (constante SCRIPT_URL)
+ *
+ * MIGRACIÓN desde v2:
+ *   - Hoja Tareas: se agregan columnas cancelledAt + justificante después de completedAt
+ *   - Hoja Bitacora: se agregan anio + mes + semana después de project
+ *   - Se crea hoja Historial nueva
+ *   - Estados legacy se normalizan: Backlog→Por iniciar, Gabinete→En progreso,
+ *     Esperando→En espera, Campo→Por iniciar
  */
 
 // =====================================================
@@ -20,15 +27,17 @@
 const SH = {
   TAREAS:       'Tareas',
   BITACORA:     'Bitacora',
+  HISTORIAL:    'Historial',
   PROYECTOS:    'Config_Proyectos',
   HERRAMIENTAS: 'Config_Herramientas',
   BLOQUEADORES: 'Config_Bloqueadores'
 };
 
 const HEADERS = {
-  TAREAS: ['id','createdAt','updatedAt','title','desc','project','priority','tool','status','blocker','startDate','dueDate','evidenceLink','evidencePending','completedAt','deleted','source'],
-  BITACORA: ['id','taskId','taskTitle','project','date','startTime','endTime','minutes'],
-  CONFIG: ['id','nombre','activo']
+  TAREAS:    ['id','createdAt','updatedAt','title','desc','project','priority','tool','status','blocker','startDate','dueDate','evidenceLink','evidencePending','completedAt','cancelledAt','justificante','deleted','source'],
+  BITACORA:  ['id','taskId','taskTitle','project','anio','mes','semana','date','startTime','endTime','minutes'],
+  HISTORIAL: ['anio','mes','nombreMes','semana','diaSemana','fecha','taskId','titulo','proyecto','prioridad','herramienta','estado','justificante','tiempoTotalMinutos','evidenceLink','evidencePending'],
+  CONFIG:    ['id','nombre','activo']
 };
 
 const DEFAULTS = {
@@ -37,15 +46,25 @@ const DEFAULTS = {
   BLOQUEADORES: ['Marcos (MOP)','Luis (Campo)','Francisco (Campo)','Alicia (Finanzas)','Herbert (Oficina técnica)','Pa','Subcontratista','Proveedor','Alcaldía / CNR']
 };
 
-const STATUSES = ['Backlog','Esperando','Gabinete','Campo','Completado'];
+const STATUSES   = ['Por iniciar','En progreso','En espera','Pausado','Cancelado','Completado'];
 const PRIORITIES = ['Alta','Media','Baja'];
-const TZ = 'America/El_Salvador';
+const TZ         = 'America/El_Salvador';
+
+const LEGACY_STATUS_MAP = {
+  'Backlog':    'Por iniciar',
+  'Gabinete':   'En progreso',
+  'Esperando':  'En espera',
+  'Campo':      'Por iniciar'
+};
+
+const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DIAS_ES  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
 // =====================================================
 // ENTRY POINTS
 // =====================================================
 function doGet(e) {
-  return json({ ok:true, ping:'CONVASES Task Manager API', time:new Date().toISOString() });
+  return json({ ok:true, ping:'CONVASES Task Manager API v3', time:new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -81,16 +100,18 @@ function json(obj) {
 function actionInit() {
   ensureSheets();
   return {
-    tasks:    listTasks(),
-    bitacora: listTodayBitacora(),
-    active:   findActiveBitacora(),
+    tasks:      listTasks(),
+    bitacora:   listTodayBitacora(),
+    active:     findActiveBitacora(),
+    taskTotals: computeTaskTotals(),
     config: {
       proyectos:    listConfig(SH.PROYECTOS),
       herramientas: listConfig(SH.HERRAMIENTAS),
       bloqueadores: listConfig(SH.BLOQUEADORES)
     },
     statuses:   STATUSES,
-    priorities: PRIORITIES
+    priorities: PRIORITIES,
+    serverTime: new Date().toISOString()
   };
 }
 
@@ -101,7 +122,8 @@ function listTasks() {
   const headers = data[0];
   return data.slice(1)
     .map(r => rowToObject(r, headers))
-    .filter(t => !asBool(t.deleted));
+    .filter(t => !asBool(t.deleted))
+    .map(t => { t.status = normalizeStatus(t.status); return t; });
 }
 
 function actionSaveTask(body) {
@@ -111,52 +133,69 @@ function actionSaveTask(body) {
   const headers = HEADERS.TAREAS;
   let row = findRowById(sh, t.id);
 
+  const incomingStatus = normalizeStatus(t.status);
+  // Cancelado requiere justificante
+  if (incomingStatus === 'Cancelado' && !String(t.justificante || '').trim()) {
+    throw new Error('Para cancelar una tarea se requiere justificante');
+  }
+
   if (!row) {
-    // CREATE
     const obj = {
-      id:               t.id || uid(),
-      createdAt:        now,
-      updatedAt:        now,
-      title:            t.title || '',
-      desc:             t.desc || '',
-      project:          t.project || '',
-      priority:         PRIORITIES.indexOf(t.priority) >= 0 ? t.priority : 'Media',
-      tool:             t.tool || '',
-      status:           STATUSES.indexOf(t.status) >= 0 ? t.status : 'Backlog',
-      blocker:          t.blocker || '',
-      startDate:        t.startDate || '',
-      dueDate:          t.dueDate || '',
-      evidenceLink:     t.evidenceLink || '',
-      evidencePending:  !!t.evidencePending,
-      completedAt:      t.status === 'Completado' ? now : '',
-      deleted:          false,
-      source:           t.source || 'manual'
+      id:              t.id || uid(),
+      createdAt:       now,
+      updatedAt:       now,
+      title:           t.title || '',
+      desc:            t.desc || '',
+      project:         t.project || '',
+      priority:        PRIORITIES.indexOf(t.priority) >= 0 ? t.priority : 'Media',
+      tool:            t.tool || '',
+      status:          incomingStatus || 'Por iniciar',
+      blocker:         t.blocker || '',
+      startDate:       t.startDate || '',
+      dueDate:         t.dueDate || '',
+      evidenceLink:    t.evidenceLink || '',
+      evidencePending: !!t.evidencePending,
+      completedAt:     incomingStatus === 'Completado' ? now : '',
+      cancelledAt:     incomingStatus === 'Cancelado'  ? now : '',
+      justificante:    t.justificante || '',
+      deleted:         false,
+      source:          t.source || 'manual'
     };
     sh.appendRow(objectToRow(obj, headers));
+    maybeAppendHistorial(obj, null);
     return obj;
-  } else {
-    // UPDATE
-    const existing = rowToObject(sh.getRange(row.rowIndex, 1, 1, headers.length).getValues()[0], headers);
-    const wasCompleted = existing.status === 'Completado';
-    const nowCompleted = t.status === 'Completado';
-    const merged = Object.assign({}, existing, {
-      title:            t.title ?? existing.title,
-      desc:             t.desc ?? existing.desc,
-      project:          t.project ?? existing.project,
-      priority:         t.priority ?? existing.priority,
-      tool:             t.tool ?? existing.tool,
-      status:           t.status ?? existing.status,
-      blocker:          t.blocker ?? existing.blocker,
-      startDate:        t.startDate ?? existing.startDate,
-      dueDate:          t.dueDate ?? existing.dueDate,
-      evidenceLink:     t.evidenceLink ?? existing.evidenceLink,
-      evidencePending:  typeof t.evidencePending === 'boolean' ? t.evidencePending : asBool(existing.evidencePending),
-      updatedAt:        now,
-      completedAt:      (!wasCompleted && nowCompleted) ? now : (nowCompleted ? existing.completedAt : '')
-    });
-    sh.getRange(row.rowIndex, 1, 1, headers.length).setValues([objectToRow(merged, headers)]);
-    return merged;
   }
+
+  const existing = rowToObject(sh.getRange(row.rowIndex, 1, 1, headers.length).getValues()[0], headers);
+  existing.status = normalizeStatus(existing.status);
+  const wasTerminal = existing.status === 'Completado' || existing.status === 'Cancelado';
+  const nowTerminal = incomingStatus === 'Completado' || incomingStatus === 'Cancelado';
+  const transitionedToTerminal = !wasTerminal && nowTerminal;
+
+  const merged = Object.assign({}, existing, {
+    title:           t.title ?? existing.title,
+    desc:            t.desc ?? existing.desc,
+    project:         t.project ?? existing.project,
+    priority:        t.priority ?? existing.priority,
+    tool:            t.tool ?? existing.tool,
+    status:          incomingStatus,
+    blocker:         t.blocker ?? existing.blocker,
+    startDate:       t.startDate ?? existing.startDate,
+    dueDate:         t.dueDate ?? existing.dueDate,
+    evidenceLink:    t.evidenceLink ?? existing.evidenceLink,
+    evidencePending: typeof t.evidencePending === 'boolean' ? t.evidencePending : asBool(existing.evidencePending),
+    justificante:    t.justificante ?? existing.justificante,
+    updatedAt:       now,
+    completedAt:     incomingStatus === 'Completado'
+                       ? (existing.completedAt || now)
+                       : (incomingStatus === 'Cancelado' ? existing.completedAt : ''),
+    cancelledAt:     incomingStatus === 'Cancelado'
+                       ? (existing.cancelledAt || now)
+                       : ''
+  });
+  sh.getRange(row.rowIndex, 1, 1, headers.length).setValues([objectToRow(merged, headers)]);
+  if (transitionedToTerminal) maybeAppendHistorial(merged, existing);
+  return merged;
 }
 
 function actionDeleteTask(body) {
@@ -169,6 +208,38 @@ function actionDeleteTask(body) {
   obj.updatedAt = new Date().toISOString();
   sh.getRange(row.rowIndex, 1, 1, headers.length).setValues([objectToRow(obj, headers)]);
   return { id: body.id, deleted: true };
+}
+
+// =====================================================
+// HISTORIAL
+// =====================================================
+function maybeAppendHistorial(task, previous) {
+  const status = normalizeStatus(task.status);
+  if (status !== 'Completado' && status !== 'Cancelado') return;
+  const sh = getSheet(SH.HISTORIAL);
+  const eventDate = status === 'Completado'
+    ? new Date(task.completedAt || new Date())
+    : new Date(task.cancelledAt || new Date());
+  const totalMin = computeTotalMinutesForTask(task.id);
+  const row = {
+    anio:                 eventDate.getFullYear(),
+    mes:                  eventDate.getMonth() + 1,
+    nombreMes:            MESES_ES[eventDate.getMonth()],
+    semana:               getIsoWeek(eventDate),
+    diaSemana:            DIAS_ES[eventDate.getDay()],
+    fecha:                Utilities.formatDate(eventDate, TZ, 'yyyy-MM-dd'),
+    taskId:               task.id,
+    titulo:               task.title || '',
+    proyecto:             task.project || '',
+    prioridad:            task.priority || '',
+    herramienta:          task.tool || '',
+    estado:               status,
+    justificante:         task.justificante || '',
+    tiempoTotalMinutos:   totalMin,
+    evidenceLink:         task.evidenceLink || '',
+    evidencePending:      !!task.evidencePending
+  };
+  sh.appendRow(objectToRow(row, HEADERS.HISTORIAL));
 }
 
 // =====================================================
@@ -191,12 +262,22 @@ function actionStartWork(body) {
     taskId:    body.taskId,
     taskTitle: t.title,
     project:   t.project,
+    anio:      now.getFullYear(),
+    mes:       now.getMonth() + 1,
+    semana:    getIsoWeek(now),
     date:      Utilities.formatDate(now, TZ, 'yyyy-MM-dd'),
     startTime: now.toISOString(),
     endTime:   '',
     minutes:   ''
   };
   sh.appendRow(objectToRow(entry, HEADERS.BITACORA));
+
+  // Si la tarea está en "Por iniciar" o "Pausado", pasarla a "En progreso"
+  const currentStatus = normalizeStatus(t.status);
+  if (currentStatus === 'Por iniciar' || currentStatus === 'Pausado') {
+    actionSaveTask({ task: { id: body.taskId, status: 'En progreso' } });
+  }
+
   return entry;
 }
 
@@ -249,6 +330,34 @@ function findActiveBitacora() {
   return null;
 }
 
+function computeTaskTotals() {
+  const sh = getSheet(SH.BITACORA);
+  const data = sh.getDataRange().getValues();
+  if (data.length < 2) return {};
+  const headers = data[0];
+  const totals = {};
+  for (let i = 1; i < data.length; i++) {
+    const b = rowToObject(data[i], headers);
+    if (!b.taskId) continue;
+    const m = Number(b.minutes) || 0;
+    totals[b.taskId] = (totals[b.taskId] || 0) + m;
+  }
+  return totals;
+}
+
+function computeTotalMinutesForTask(taskId) {
+  const sh = getSheet(SH.BITACORA);
+  const data = sh.getDataRange().getValues();
+  if (data.length < 2) return 0;
+  const headers = data[0];
+  let total = 0;
+  for (let i = 1; i < data.length; i++) {
+    const b = rowToObject(data[i], headers);
+    if (b.taskId === taskId) total += Number(b.minutes) || 0;
+  }
+  return total;
+}
+
 // =====================================================
 // ACTIONS — CONFIG
 // =====================================================
@@ -272,19 +381,17 @@ function actionSaveConfig(body) {
     const obj = { id: item.id || uid(), nombre: item.nombre || '', activo: item.activo !== false };
     sh.appendRow(objectToRow(obj, headers));
     return obj;
-  } else {
-    const existing = rowToObject(sh.getRange(row.rowIndex, 1, 1, headers.length).getValues()[0], headers);
-    const merged = Object.assign({}, existing, {
-      nombre: item.nombre ?? existing.nombre,
-      activo: typeof item.activo === 'boolean' ? item.activo : asBool(existing.activo)
-    });
-    sh.getRange(row.rowIndex, 1, 1, headers.length).setValues([objectToRow(merged, headers)]);
-    return merged;
   }
+  const existing = rowToObject(sh.getRange(row.rowIndex, 1, 1, headers.length).getValues()[0], headers);
+  const merged = Object.assign({}, existing, {
+    nombre: item.nombre ?? existing.nombre,
+    activo: typeof item.activo === 'boolean' ? item.activo : asBool(existing.activo)
+  });
+  sh.getRange(row.rowIndex, 1, 1, headers.length).setValues([objectToRow(merged, headers)]);
+  return merged;
 }
 
 function actionDeleteConfig(body) {
-  // Soft-delete: marca activo=false (nunca borra)
   const sheetName = configSheetName(body.type);
   const sh = getSheet(sheetName);
   const row = findRowById(sh, body.id);
@@ -304,13 +411,12 @@ function configSheetName(type) {
 }
 
 // =====================================================
-// AI — GEMINI
+// AI — CLAUDE
 // =====================================================
 function actionParseAI(body) {
   const text = (body.text || '').trim();
   if (!text) return { tasks: [] };
   const parsed = callClaude(text);
-  // Guardar todas en Backlog directamente (Moi las edita después)
   const saved = parsed.map(p => actionSaveTask({
     task: {
       title:    p.title || 'Tarea sin título',
@@ -318,7 +424,7 @@ function actionParseAI(body) {
       project:  p.project || '',
       priority: p.priority || 'Media',
       tool:     p.tool || '',
-      status:   p.status || 'Backlog',
+      status:   normalizeStatus(p.status) || 'Por iniciar',
       blocker:  p.blocker || '',
       dueDate:  p.dueDate || '',
       source:   'ai'
@@ -342,16 +448,16 @@ function callClaude(text) {
     '',
     'PROYECTOS válidos: ' + proyectos.join(', '),
     'HERRAMIENTAS válidas: ' + herramientas.join(', '),
-    'ESTADOS válidos: Backlog, Esperando, Gabinete, Campo',
+    'ESTADOS válidos para captura inicial: Por iniciar, En progreso, En espera',
     'PRIORIDADES: Alta, Media, Baja',
     'BLOQUEADORES posibles: ' + bloqueadores.join(', '),
     '',
     'REGLAS:',
     '- Si menciona "Pa" o "urgente" → priority Alta.',
-    '- Si menciona esperar a alguien o "bloqueado por" → status Esperando + blocker apropiado.',
-    '- Si menciona CAD/Revit/dibujo/Excel/estimación → status Gabinete + tool apropiado.',
-    '- Si menciona ir/visitar/inspeccionar/MOP/alcaldía → status Campo.',
-    '- Si no hay info clara → status Backlog (que él lo edite luego).',
+    '- Si menciona esperar a alguien o "bloqueado por" → status En espera + blocker apropiado.',
+    '- Si menciona CAD/Revit/dibujo/Excel/estimación → status En progreso + tool apropiado.',
+    '- Si menciona ir/visitar/inspeccionar/MOP/alcaldía → tool "Campo presencial" + status Por iniciar.',
+    '- Si no hay info clara → status Por iniciar.',
     '- Si menciona ChatGPT/IA/Claude/análisis con IA → tool "IA".',
     '- desc: detalles adicionales útiles, NO repitas el title.',
     '- dueDate: solo si menciona fecha explícita (formato YYYY-MM-DD).',
@@ -359,7 +465,7 @@ function callClaude(text) {
     '- Title corto y accionable, en imperativo cuando posible.',
     '',
     'Devolvé SOLO un array JSON con esta estructura, sin texto adicional, sin markdown, sin code fences:',
-    '[{"title":"","desc":"","project":"","priority":"Alta|Media|Baja","tool":"","status":"Backlog|Esperando|Gabinete|Campo","blocker":"","dueDate":""}]'
+    '[{"title":"","desc":"","project":"","priority":"Alta|Media|Baja","tool":"","status":"Por iniciar|En progreso|En espera","blocker":"","dueDate":""}]'
   ].join('\n');
 
   const payload = {
@@ -384,7 +490,6 @@ function callClaude(text) {
   if (code !== 200) throw new Error('Anthropic ' + code + ': ' + txt.slice(0, 300));
   const data = JSON.parse(txt);
   const raw = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
-  // Stripear markdown fences por si acaso Claude los agrega
   const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
   let arr;
   try { arr = JSON.parse(cleaned); } catch (e) { throw new Error('Claude devolvió JSON inválido: ' + cleaned.slice(0,200)); }
@@ -399,19 +504,22 @@ function dailyMorningEmail() {
   const tasks = listTasks();
   const today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
   const inSevenDays = Utilities.formatDate(new Date(Date.now() + 7*86400000), TZ, 'yyyy-MM-dd');
+  const isOpen = t => ['Por iniciar','En progreso','En espera','Pausado'].indexOf(t.status) >= 0;
 
-  const overdue   = tasks.filter(t => t.status !== 'Completado' && t.dueDate && fmtDate(t.dueDate) < today);
-  const dueToday  = tasks.filter(t => t.status !== 'Completado' && t.dueDate && fmtDate(t.dueDate) === today);
-  const dueWeek   = tasks.filter(t => t.status !== 'Completado' && t.dueDate && fmtDate(t.dueDate) > today && fmtDate(t.dueDate) <= inSevenDays);
-  const blocked   = tasks.filter(t => t.status === 'Esperando');
-  const urgentND  = tasks.filter(t => t.status !== 'Completado' && t.priority === 'Alta' && !t.dueDate);
+  const overdue   = tasks.filter(t => isOpen(t) && t.dueDate && fmtDate(t.dueDate) < today);
+  const dueToday  = tasks.filter(t => isOpen(t) && t.dueDate && fmtDate(t.dueDate) === today);
+  const dueWeek   = tasks.filter(t => isOpen(t) && t.dueDate && fmtDate(t.dueDate) > today && fmtDate(t.dueDate) <= inSevenDays);
+  const blocked   = tasks.filter(t => t.status === 'En espera');
+  const paused    = tasks.filter(t => t.status === 'Pausado');
+  const urgentND  = tasks.filter(t => isOpen(t) && t.priority === 'Alta' && !t.dueDate);
 
   const sections = [
-    { title: '🔴 VENCIDAS',                items: overdue },
-    { title: '🟡 PARA HOY',                items: dueToday },
-    { title: '📅 ESTA SEMANA',             items: dueWeek },
-    { title: '⏳ BLOQUEADAS',              items: blocked },
-    { title: '⚡ URGENTES SIN FECHA',      items: urgentND }
+    { title: '🔴 VENCIDAS',           items: overdue },
+    { title: '🟡 PARA HOY',           items: dueToday },
+    { title: '📅 ESTA SEMANA',        items: dueWeek },
+    { title: '⏳ EN ESPERA',          items: blocked },
+    { title: '⏸ PAUSADAS',            items: paused },
+    { title: '⚡ URGENTES SIN FECHA', items: urgentND }
   ];
 
   const totalCount = sections.reduce((n, s) => n + s.items.length, 0);
@@ -431,9 +539,8 @@ function dailyMorningEmail() {
 
 function dailyEveningEmail() {
   const today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
-  const entries = listBitacoraByDate(today).filter(b => b.endTime); // solo cerrados
+  const entries = listBitacoraByDate(today).filter(b => b.endTime);
 
-  // Agrupar por proyecto
   const byProject = {};
   let totalMin = 0;
   entries.forEach(e => {
@@ -445,7 +552,14 @@ function dailyEveningEmail() {
   });
 
   const tasks = listTasks();
-  const evidencePending = tasks.filter(t => t.status === 'Completado' && asBool(t.evidencePending));
+  const workedTodayIds = new Set(entries.map(e => e.taskId));
+  // evidencia pendiente: tareas con evidencePending=true trabajadas hoy O cerradas hoy
+  const evidencePending = tasks.filter(t => {
+    if (!asBool(t.evidencePending)) return false;
+    const closedToday = (t.completedAt && String(t.completedAt).slice(0,10) === today) ||
+                        (t.cancelledAt && String(t.cancelledAt).slice(0,10) === today);
+    return workedTodayIds.has(t.id) || closedToday;
+  });
 
   if (entries.length === 0 && evidencePending.length === 0) {
     sendEmail('CONVASES · ' + today + ' · sin bitácora', '<p>No registraste tiempo hoy. Hasta mañana.</p>');
@@ -471,7 +585,21 @@ function dailyEveningEmail() {
   if (evidencePending.length) {
     html += '<h3 style="margin:20px 0 8px;font-size:14px">📎 EVIDENCIA PENDIENTE DE SUBIR</h3>' +
       '<ul style="margin:0;padding-left:20px;color:#444;font-size:13px">' +
-        evidencePending.map(t => '<li>' + escapeHtml(t.title) + (t.project ? ' <span style="color:#888">— ' + escapeHtml(t.project) + '</span>' : '') + '</li>').join('') +
+        evidencePending.map(t => {
+          const parts = [escapeHtml(t.title)];
+          const meta = [];
+          if (t.project)   meta.push(escapeHtml(t.project));
+          if (t.status)    meta.push(escapeHtml(t.status));
+          if (meta.length) parts.push(' <span style="color:#888">— ' + meta.join(' · ') + '</span>');
+          if (t.evidenceLink) {
+            if (/^https?:/i.test(t.evidenceLink)) {
+              parts.push('<br><a href="' + escapeHtml(t.evidenceLink) + '" style="color:#3a7bd5;font-size:12px">🔗 ' + escapeHtml(t.evidenceLink.slice(0,80)) + '</a>');
+            } else {
+              parts.push('<br><code style="color:#888;font-size:11px;background:#eee;padding:1px 4px;border-radius:3px">' + escapeHtml(t.evidenceLink) + '</code>');
+            }
+          }
+          return '<li style="margin-bottom:6px">' + parts.join('') + '</li>';
+        }).join('') +
       '</ul>';
   }
 
@@ -485,10 +613,10 @@ function sectionHTML(title, items) {
       items.map(t => {
         const parts = [escapeHtml(t.title)];
         const meta = [];
-        if (t.project) meta.push(escapeHtml(t.project));
+        if (t.project)            meta.push(escapeHtml(t.project));
         if (t.priority === 'Alta') meta.push('Alta');
-        if (t.dueDate) meta.push(fmtDate(t.dueDate));
-        if (t.blocker) meta.push('⏳ ' + escapeHtml(t.blocker));
+        if (t.dueDate)            meta.push(fmtDate(t.dueDate));
+        if (t.blocker)            meta.push('⏳ ' + escapeHtml(t.blocker));
         if (meta.length) parts.push('<span style="color:#888"> — ' + meta.join(' · ') + '</span>');
         return '<li>' + parts.join('') + '</li>';
       }).join('') +
@@ -502,18 +630,20 @@ function sendEmail(subject, htmlBody) {
 }
 
 // =====================================================
-// SETUP — corre estos manualmente UNA SOLA VEZ
+// SETUP — correr manualmente
 // =====================================================
 function setupAll() {
   ensureSheets();
+  migrateSheets();
   installTriggers();
-  Logger.log('Setup completo. Verificá Script Properties: API_TOKEN, GEMINI_API_KEY, SHEET_ID, EMAIL_TO');
+  Logger.log('Setup v3 completo. Verificá Script Properties: API_TOKEN, ANTHROPIC_API_KEY, SHEET_ID, EMAIL_TO');
 }
 
 function ensureSheets() {
   const ss = SpreadsheetApp.openById(prop('SHEET_ID'));
-  ensureSheet(ss, SH.TAREAS, HEADERS.TAREAS);
-  ensureSheet(ss, SH.BITACORA, HEADERS.BITACORA);
+  ensureSheet(ss, SH.TAREAS,    HEADERS.TAREAS);
+  ensureSheet(ss, SH.BITACORA,  HEADERS.BITACORA);
+  ensureSheet(ss, SH.HISTORIAL, HEADERS.HISTORIAL);
   seedIfEmpty(ss, SH.PROYECTOS,    HEADERS.CONFIG, DEFAULTS.PROYECTOS);
   seedIfEmpty(ss, SH.HERRAMIENTAS, HEADERS.CONFIG, DEFAULTS.HERRAMIENTAS);
   seedIfEmpty(ss, SH.BLOQUEADORES, HEADERS.CONFIG, DEFAULTS.BLOQUEADORES);
@@ -529,7 +659,6 @@ function ensureSheet(ss, name, headers) {
   let sh = ss.getSheetByName(name);
   const created = !sh;
   if (!sh) sh = ss.insertSheet(name);
-  // headers si la hoja está vacía
   if (sh.getLastRow() === 0) {
     sh.getRange(1, 1, 1, headers.length).setValues([headers]);
     sh.setFrozenRows(1);
@@ -542,6 +671,84 @@ function seedConfig(sh, names) {
   const headers = HEADERS.CONFIG;
   const rows = names.map(n => objectToRow({ id: uid(), nombre: n, activo: true }, headers));
   sh.getRange(2, 1, rows.length, headers.length).setValues(rows);
+}
+
+/**
+ * Migra hojas v2 → v3 sin destruir datos.
+ * Idempotente: se puede correr varias veces.
+ */
+function migrateSheets() {
+  const ss = SpreadsheetApp.openById(prop('SHEET_ID'));
+
+  // Tareas: insertar cancelledAt + justificante después de completedAt
+  const tareas = ss.getSheetByName(SH.TAREAS);
+  if (tareas && tareas.getLastColumn() > 0) {
+    const lastCol = tareas.getLastColumn();
+    const headers = tareas.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h));
+    const hasCanc = headers.indexOf('cancelledAt') !== -1;
+    const hasJust = headers.indexOf('justificante') !== -1;
+    if (!hasCanc || !hasJust) {
+      const completedIdx = headers.indexOf('completedAt');
+      if (completedIdx !== -1) {
+        const insertAfter = completedIdx + 1; // 1-based column
+        tareas.insertColumnsAfter(insertAfter, 2);
+        tareas.getRange(1, insertAfter + 1).setValue('cancelledAt').setFontWeight('bold').setBackground('#1a1e2b').setFontColor('#e8a020');
+        tareas.getRange(1, insertAfter + 2).setValue('justificante').setFontWeight('bold').setBackground('#1a1e2b').setFontColor('#e8a020');
+        Logger.log('Migración Tareas: agregadas cancelledAt + justificante');
+      }
+    }
+  }
+
+  // Bitacora: insertar anio + mes + semana después de project
+  const bita = ss.getSheetByName(SH.BITACORA);
+  if (bita && bita.getLastColumn() > 0) {
+    const lastCol = bita.getLastColumn();
+    const headers = bita.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h));
+    if (headers.indexOf('anio') === -1) {
+      const projIdx = headers.indexOf('project');
+      if (projIdx !== -1) {
+        const insertAfter = projIdx + 1; // 1-based
+        bita.insertColumnsAfter(insertAfter, 3);
+        bita.getRange(1, insertAfter + 1).setValue('anio').setFontWeight('bold').setBackground('#1a1e2b').setFontColor('#e8a020');
+        bita.getRange(1, insertAfter + 2).setValue('mes').setFontWeight('bold').setBackground('#1a1e2b').setFontColor('#e8a020');
+        bita.getRange(1, insertAfter + 3).setValue('semana').setFontWeight('bold').setBackground('#1a1e2b').setFontColor('#e8a020');
+        // Backfill: leer date (que se desplazó 3 columnas) y calcular anio/mes/semana
+        const lastRow = bita.getLastRow();
+        if (lastRow > 1) {
+          const dateColIdx = headers.indexOf('date') + 1 + 3;
+          const dates = bita.getRange(2, dateColIdx, lastRow - 1, 1).getValues();
+          const fills = dates.map(([d]) => {
+            if (!d) return ['', '', ''];
+            const dt = d instanceof Date ? d : new Date(d);
+            if (isNaN(dt)) return ['', '', ''];
+            return [dt.getFullYear(), dt.getMonth() + 1, getIsoWeek(dt)];
+          });
+          if (fills.length) bita.getRange(2, insertAfter + 1, fills.length, 3).setValues(fills);
+        }
+        Logger.log('Migración Bitacora: agregadas anio/mes/semana con backfill');
+      }
+    }
+  }
+
+  // Normalizar estados legacy en Tareas
+  const tareasSh = ss.getSheetByName(SH.TAREAS);
+  if (tareasSh && tareasSh.getLastRow() > 1) {
+    const headers = tareasSh.getRange(1, 1, 1, tareasSh.getLastColumn()).getValues()[0].map(h => String(h));
+    const statusIdx = headers.indexOf('status');
+    if (statusIdx !== -1) {
+      const range = tareasSh.getRange(2, statusIdx + 1, tareasSh.getLastRow() - 1, 1);
+      const vals = range.getValues();
+      let changed = false;
+      for (let i = 0; i < vals.length; i++) {
+        const s = String(vals[i][0] || '');
+        if (LEGACY_STATUS_MAP[s]) { vals[i][0] = LEGACY_STATUS_MAP[s]; changed = true; }
+      }
+      if (changed) {
+        range.setValues(vals);
+        Logger.log('Migración Tareas: estados legacy normalizados');
+      }
+    }
+  }
 }
 
 function installTriggers() {
@@ -567,7 +774,9 @@ function getSheet(name) {
 
 function findRowById(sh, id) {
   if (!id) return null;
-  const data = sh.getRange(2, 1, Math.max(1, sh.getLastRow() - 1), 1).getValues();
+  const last = sh.getLastRow();
+  if (last < 2) return null;
+  const data = sh.getRange(2, 1, last - 1, 1).getValues();
   for (let i = 0; i < data.length; i++) {
     if (String(data[i][0]) === String(id)) return { rowIndex: i + 2 };
   }
@@ -577,11 +786,10 @@ function findRowById(sh, id) {
 function rowToObject(row, headers) {
   const o = {};
   headers.forEach((h, i) => o[h] = row[i]);
-  // normalizar fechas que vienen como Date
-  ['createdAt','updatedAt','completedAt','startTime','endTime'].forEach(k => {
+  ['createdAt','updatedAt','completedAt','cancelledAt','startTime','endTime'].forEach(k => {
     if (o[k] instanceof Date) o[k] = o[k].toISOString();
   });
-  ['startDate','dueDate','date'].forEach(k => {
+  ['startDate','dueDate','date','fecha'].forEach(k => {
     if (o[k] instanceof Date) o[k] = Utilities.formatDate(o[k], TZ, 'yyyy-MM-dd');
   });
   return o;
@@ -601,6 +809,21 @@ function asBool(v) {
   if (v === 'TRUE' || v === 'true') return true;
   if (v === 'FALSE' || v === 'false') return false;
   return !!v;
+}
+
+function normalizeStatus(s) {
+  if (!s) return 'Por iniciar';
+  if (LEGACY_STATUS_MAP[s]) return LEGACY_STATUS_MAP[s];
+  if (STATUSES.indexOf(s) >= 0) return s;
+  return 'Por iniciar';
+}
+
+function getIsoWeek(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
 }
 
 function uid() {
