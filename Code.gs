@@ -3,10 +3,10 @@
  *
  * SETUP (ver README.md):
  *   1. Script Properties (Configuración del proyecto > Script Properties):
- *        - API_TOKEN      → token secreto compartido con el frontend
- *        - GEMINI_API_KEY → key de Google AI Studio (https://aistudio.google.com/apikey)
- *        - SHEET_ID       → 1LzjQQLFh5719qyEzpBYSYclcbuIiF3IE_MSR3XZpXxA
- *        - EMAIL_TO       → moises.vasquez999@gmail.com
+ *        - API_TOKEN          → token secreto compartido con el frontend
+ *        - ANTHROPIC_API_KEY  → key de Anthropic (https://console.anthropic.com/settings/keys)
+ *        - SHEET_ID           → 1LzjQQLFh5719qyEzpBYSYclcbuIiF3IE_MSR3XZpXxA
+ *        - EMAIL_TO           → moises.vasquez999@gmail.com
  *   2. Correr una vez manualmente: setupAll() — crea hojas e instala triggers
  *   3. Deploy > Nueva implementación > Web app
  *        - Execute as: Me (moises.vasquez999@gmail.com)
@@ -309,7 +309,7 @@ function configSheetName(type) {
 function actionParseAI(body) {
   const text = (body.text || '').trim();
   if (!text) return { tasks: [] };
-  const parsed = callGemini(text);
+  const parsed = callClaude(text);
   // Guardar todas en Backlog directamente (Moi las edita después)
   const saved = parsed.map(p => actionSaveTask({
     task: {
@@ -327,9 +327,9 @@ function actionParseAI(body) {
   return { tasks: saved };
 }
 
-function callGemini(text) {
-  const apiKey = prop('GEMINI_API_KEY');
-  if (!apiKey) throw new Error('GEMINI_API_KEY no configurada en Script Properties');
+function callClaude(text) {
+  const apiKey = prop('ANTHROPIC_API_KEY');
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY no configurada en Script Properties');
 
   const proyectos    = listConfig(SH.PROYECTOS).map(p => p.nombre);
   const herramientas = listConfig(SH.HERRAMIENTAS).map(h => h.nombre);
@@ -354,54 +354,40 @@ function callGemini(text) {
     '- Si no hay info clara → status Backlog (que él lo edite luego).',
     '- Si menciona ChatGPT/IA/Claude/análisis con IA → tool "IA".',
     '- desc: detalles adicionales útiles, NO repitas el title.',
-    '- due: solo si menciona fecha explícita (formato YYYY-MM-DD).',
+    '- dueDate: solo si menciona fecha explícita (formato YYYY-MM-DD).',
     '- Una sola tarea por idea separada. Si el texto tiene varias tareas separadas por coma/punto/"y", devolvé varias.',
     '- Title corto y accionable, en imperativo cuando posible.',
     '',
-    'Devolvé SOLO JSON, sin texto adicional.'
+    'Devolvé SOLO un array JSON con esta estructura, sin texto adicional, sin markdown, sin code fences:',
+    '[{"title":"","desc":"","project":"","priority":"Alta|Media|Baja","tool":"","status":"Backlog|Esperando|Gabinete|Campo","blocker":"","dueDate":""}]'
   ].join('\n');
 
-  const schema = {
-    type: 'ARRAY',
-    items: {
-      type: 'OBJECT',
-      properties: {
-        title:    { type: 'STRING' },
-        desc:     { type: 'STRING' },
-        project:  { type: 'STRING' },
-        priority: { type: 'STRING', enum: PRIORITIES },
-        tool:     { type: 'STRING' },
-        status:   { type: 'STRING', enum: ['Backlog','Esperando','Gabinete','Campo'] },
-        blocker:  { type: 'STRING' },
-        dueDate:  { type: 'STRING' }
-      },
-      required: ['title']
-    }
+  const payload = {
+    model: 'claude-haiku-4-5',
+    max_tokens: 2048,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: text }]
   };
 
-  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + apiKey;
-  const payload = {
-    contents: [{ role:'user', parts:[{ text: text }] }],
-    systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: schema,
-      temperature: 0.2
-    }
-  };
-  const res = UrlFetchApp.fetch(url, {
+  const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
     method: 'post',
     contentType: 'application/json',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   });
   const code = res.getResponseCode();
   const txt = res.getContentText();
-  if (code !== 200) throw new Error('Gemini ' + code + ': ' + txt.slice(0, 300));
+  if (code !== 200) throw new Error('Anthropic ' + code + ': ' + txt.slice(0, 300));
   const data = JSON.parse(txt);
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+  const raw = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+  // Stripear markdown fences por si acaso Claude los agrega
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
   let arr;
-  try { arr = JSON.parse(raw); } catch (e) { throw new Error('Gemini devolvió JSON inválido: ' + raw.slice(0,200)); }
+  try { arr = JSON.parse(cleaned); } catch (e) { throw new Error('Claude devolvió JSON inválido: ' + cleaned.slice(0,200)); }
   if (!Array.isArray(arr)) arr = [arr];
   return arr;
 }
