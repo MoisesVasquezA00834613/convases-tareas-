@@ -34,7 +34,7 @@ const SH = {
 };
 
 const HEADERS = {
-  TAREAS:    ['id','createdAt','updatedAt','title','desc','project','priority','tool','status','blocker','startDate','dueDate','evidenceLink','evidencePending','completedAt','cancelledAt','justificante','deleted','source'],
+  TAREAS:    ['id','createdAt','updatedAt','title','desc','project','priority','tool','status','blocker','startDate','dueDate','evidenceLink','evidencePending','completedAt','cancelledAt','justificante','waitReason','dependsOnId','dependsOnTitle','deleted','source'],
   BITACORA:  ['id','taskId','taskTitle','project','anio','mes','semana','date','startTime','endTime','minutes'],
   HISTORIAL: ['anio','mes','nombreMes','semana','diaSemana','fecha','taskId','titulo','proyecto','prioridad','herramienta','estado','justificante','tiempoTotalMinutos','evidenceLink','evidencePending'],
   CONFIG:    ['id','nombre','activo']
@@ -158,11 +158,15 @@ function actionSaveTask(body) {
       completedAt:     incomingStatus === 'Completado' ? now : '',
       cancelledAt:     incomingStatus === 'Cancelado'  ? now : '',
       justificante:    t.justificante || '',
+      waitReason:      t.waitReason || '',
+      dependsOnId:     t.dependsOnId || '',
+      dependsOnTitle:  t.dependsOnTitle || '',
       deleted:         false,
       source:          t.source || 'manual'
     };
     sh.appendRow(objectToRow(obj, headers));
     maybeAppendHistorial(obj, null);
+    if (incomingStatus === 'Completado') cascadeUnblockDependents(obj.id);
     return obj;
   }
 
@@ -185,6 +189,9 @@ function actionSaveTask(body) {
     evidenceLink:    t.evidenceLink ?? existing.evidenceLink,
     evidencePending: typeof t.evidencePending === 'boolean' ? t.evidencePending : asBool(existing.evidencePending),
     justificante:    t.justificante ?? existing.justificante,
+    waitReason:      t.waitReason ?? existing.waitReason,
+    dependsOnId:     t.dependsOnId ?? existing.dependsOnId,
+    dependsOnTitle:  t.dependsOnTitle ?? existing.dependsOnTitle,
     updatedAt:       now,
     completedAt:     incomingStatus === 'Completado'
                        ? (existing.completedAt || now)
@@ -195,7 +202,41 @@ function actionSaveTask(body) {
   });
   sh.getRange(row.rowIndex, 1, 1, headers.length).setValues([objectToRow(merged, headers)]);
   if (transitionedToTerminal) maybeAppendHistorial(merged, existing);
+  if (transitionedToTerminal && incomingStatus === 'Completado') cascadeUnblockDependents(merged.id);
   return merged;
+}
+
+// Cuando una tarea pasa a Completado, libera (status → Por iniciar) las
+// tareas activas que la tienen como dependsOnId. También limpia los campos
+// waitReason / dependsOnId / dependsOnTitle de las tareas liberadas.
+function cascadeUnblockDependents(parentTaskId) {
+  if (!parentTaskId) return [];
+  const sh = getSheet(SH.TAREAS);
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const headers = HEADERS.TAREAS;
+  const range = sh.getRange(2, 1, last - 1, headers.length);
+  const values = range.getValues();
+  const now = new Date().toISOString();
+  const unblocked = [];
+  let changed = false;
+  for (let i = 0; i < values.length; i++) {
+    const obj = rowToObject(values[i], headers);
+    if (asBool(obj.deleted)) continue;
+    if (String(obj.dependsOnId || '') !== String(parentTaskId)) continue;
+    const st = normalizeStatus(obj.status);
+    if (st === 'Completado' || st === 'Cancelado') continue;
+    obj.status         = 'Por iniciar';
+    obj.updatedAt      = now;
+    obj.dependsOnId    = '';
+    obj.dependsOnTitle = '';
+    obj.waitReason     = '';
+    values[i] = objectToRow(obj, headers);
+    unblocked.push(obj.id);
+    changed = true;
+  }
+  if (changed) range.setValues(values);
+  return unblocked;
 }
 
 function actionDeleteTask(body) {
@@ -695,6 +736,25 @@ function migrateSheets() {
         tareas.getRange(1, insertAfter + 1).setValue('cancelledAt').setFontWeight('bold').setBackground('#1a1e2b').setFontColor('#e8a020');
         tareas.getRange(1, insertAfter + 2).setValue('justificante').setFontWeight('bold').setBackground('#1a1e2b').setFontColor('#e8a020');
         Logger.log('Migración Tareas: agregadas cancelledAt + justificante');
+      }
+    }
+  }
+
+  // Tareas: insertar waitReason + dependsOnId + dependsOnTitle después de justificante
+  const tareasDep = ss.getSheetByName(SH.TAREAS);
+  if (tareasDep && tareasDep.getLastColumn() > 0) {
+    const lastCol = tareasDep.getLastColumn();
+    const headers = tareasDep.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h));
+    const hasWaitReason = headers.indexOf('waitReason') !== -1;
+    if (!hasWaitReason) {
+      const justIdx = headers.indexOf('justificante');
+      if (justIdx !== -1) {
+        const insertAfter = justIdx + 1; // 1-based
+        tareasDep.insertColumnsAfter(insertAfter, 3);
+        tareasDep.getRange(1, insertAfter + 1).setValue('waitReason').setFontWeight('bold').setBackground('#1a1e2b').setFontColor('#e8a020');
+        tareasDep.getRange(1, insertAfter + 2).setValue('dependsOnId').setFontWeight('bold').setBackground('#1a1e2b').setFontColor('#e8a020');
+        tareasDep.getRange(1, insertAfter + 3).setValue('dependsOnTitle').setFontWeight('bold').setBackground('#1a1e2b').setFontColor('#e8a020');
+        Logger.log('Migración Tareas: agregadas waitReason + dependsOnId + dependsOnTitle');
       }
     }
   }

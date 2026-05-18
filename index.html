@@ -409,6 +409,20 @@ textarea{resize:vertical}
 .toggle.on .tsw::after{left:17px;background:#fff}
 .toggle .tlbl{font-size:13px;color:var(--text-1);flex:1}
 .toggle .thint{font-family:var(--font-mono);font-size:10px;color:var(--text-3);margin-top:2px;display:block}
+
+/* ============ WAIT KIND PANEL ============ */
+.wait-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.wait-opt{
+  display:flex;align-items:center;gap:8px;padding:10px 12px;
+  background:var(--bg-2);border:1px solid var(--border-1);border-radius:var(--r-md);
+  cursor:pointer;font-size:12px;color:var(--text-1);
+  transition:border-color .15s,background .15s,color .15s;
+}
+.wait-opt:hover{border-color:var(--border-2)}
+.wait-opt input{accent-color:var(--accent);margin:0;flex-shrink:0}
+.wait-opt.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.wait-opt span{flex:1;line-height:1.3}
+.bdep{color:var(--purple);border-color:#a78bfa44;background:var(--purple-soft);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mbtns{display:flex;gap:8px;margin-top:22px}
 .bsave{
   flex:1;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1a1106;
@@ -606,6 +620,21 @@ textarea{resize:vertical}
       <div class="fl">Esperando a…</div>
       <select class="fs" id="fbl"></select>
     </div>
+    <div class="fg" id="waitgrp" style="display:none">
+      <div class="fl">Razón de espera <span class="req">*</span></div>
+      <div class="wait-opts">
+        <label class="wait-opt" data-kind="task"><input type="radio" name="wait-kind" value="task"><span>Depende de otra actividad</span></label>
+        <label class="wait-opt" data-kind="external"><input type="radio" name="wait-kind" value="external"><span>Espera externa</span></label>
+      </div>
+      <div id="wdep-wrap" style="display:none;margin-top:10px">
+        <div class="fl">Actividad de la que depende <span class="req">*</span></div>
+        <select class="fs" id="fdep"></select>
+      </div>
+      <div id="wreason-wrap" style="display:none;margin-top:10px">
+        <div class="fl">Justificante <span class="req" id="wreason-req" style="display:none">*</span></div>
+        <textarea class="fta" id="fwr" placeholder="Detalles, qué se está esperando, fecha aproximada…"></textarea>
+      </div>
+    </div>
     <div class="frow">
       <div class="fg"><div class="fl">Fecha inicio</div><input type="date" class="fi" id="fsi"></div>
       <div class="fg"><div class="fl">Fecha entrega</div><input type="date" class="fi" id="fdu"></div>
@@ -681,6 +710,32 @@ textarea{resize:vertical}
     <div class="mbtns">
       <button class="btxt" id="w-no">No</button>
       <button class="bsave" id="w-yes">SÍ, COMPLETAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- WAIT KIND MODAL (cuando no se llenó la razón de espera) -->
+<div id="aoverlay" class="overlay">
+  <div class="sheet">
+    <div class="mtitle"><span>¿POR QUÉ EN ESPERA?</span><button class="mclose" id="aclose">✕</button></div>
+    <div class="msub" id="a-task">—</div>
+    <div class="fg">
+      <div class="wait-opts" id="a-opts">
+        <label class="wait-opt" data-kind="task"><input type="radio" name="a-kind" value="task"><span>Depende de otra actividad</span></label>
+        <label class="wait-opt" data-kind="external"><input type="radio" name="a-kind" value="external"><span>Espera externa</span></label>
+      </div>
+      <div id="a-task-wrap" style="display:none;margin-top:12px">
+        <div class="fl">Actividad de la que depende <span class="req">*</span></div>
+        <select class="fs" id="a-dep"></select>
+      </div>
+      <div id="a-reason-wrap" style="display:none;margin-top:12px">
+        <div class="fl">Justificante <span class="req" id="a-reason-req">*</span></div>
+        <textarea class="fta" id="a-reason" placeholder="Detalles, qué se está esperando…"></textarea>
+      </div>
+    </div>
+    <div class="mbtns">
+      <button class="btxt" id="a-back">Volver</button>
+      <button class="bsave" id="a-save">CONFIRMAR</button>
     </div>
   </div>
 </div>
@@ -783,7 +838,9 @@ const state = {
   // pending cancel
   cancelFor: null,       // { taskId }
   // pending swipe confirm
-  swipeFor: null         // { taskId }
+  swipeFor: null,        // { taskId }
+  // pending wait-kind (save bloqueado por falta de razón en espera)
+  waitFor: null          // { taskId, pendingTask }
 };
 
 // =====================================================
@@ -1005,6 +1062,8 @@ function cardHTML(t) {
       ${t.project ? `<span class="b bproj">${esc(t.project)}</span>` : ''}
       ${toolBadge}
       ${t.blocker ? `<span class="b bblock">⏳ ${esc(t.blocker)}</span>` : ''}
+      ${t.status === 'En espera' && t.dependsOnTitle ? `<span class="b bdep" title="${esc(t.dependsOnTitle)}">🔗 ${esc(String(t.dependsOnTitle).slice(0,40))}</span>` : ''}
+      ${t.status === 'En espera' && !t.dependsOnTitle && t.waitReason ? `<span class="b bjust" title="${esc(t.waitReason)}">⏳ ${esc(String(t.waitReason).slice(0,50))}</span>` : ''}
       ${t.dueDate ? `<span class="b bdate${ov ? ' ov' : ''}">${ov ? '⚠ ' : ''}${fmtDate(t.dueDate)}</span>` : ''}
       <span class="b ${pc}">${t.priority || 'Media'}</span>
       ${paused && total > 0 ? `<span class="b btime">⏸ ${fmtMin(total)}</span>` : ''}
@@ -1016,6 +1075,7 @@ function cardHTML(t) {
         ? `<button class="cbtn stop" data-stop="${t.id}">⏹ Pausar <span id="liveT-${t.id}">${liveElapsed()}</span></button>`
         : `<button class="cbtn go" data-go="${t.id}">▶ Trabajando</button>`
       ) : ''}
+      ${t.status === 'En espera' ? `<button class="cbtn go" data-unblock="${t.id}">▶ Ya tengo info suficiente</button>` : ''}
       <button class="cbtn" data-ed="${t.id}">Editar</button>
       ${t.evidenceLink ? `<button class="cbtn ev" data-link="${esc(t.evidenceLink)}">🔗 Abrir</button>` : ''}
     </div>
@@ -1160,6 +1220,7 @@ function bindCards() {
   $$('[data-ed]').forEach(e => e.addEventListener('click', ev => { ev.stopPropagation(); openEdit(e.dataset.ed); }));
   $$('[data-go]').forEach(e => e.addEventListener('click', ev => { ev.stopPropagation(); startWork(e.dataset.go); }));
   $$('[data-stop]').forEach(e => e.addEventListener('click', ev => { ev.stopPropagation(); requestPause(e.dataset.stop); }));
+  $$('[data-unblock]').forEach(e => e.addEventListener('click', ev => { ev.stopPropagation(); unblockTask(e.dataset.unblock); }));
   $$('[data-link]').forEach(e => e.addEventListener('click', ev => { ev.stopPropagation(); openLink(e.dataset.link); }));
   $$('[data-col]').forEach(e => e.addEventListener('click', () => {
     state.colState[e.dataset.col] = !state.colState[e.dataset.col];
@@ -1253,17 +1314,40 @@ async function saveTask(task) {
   const idx = state.tasks.findIndex(x => x.id === task.id);
   if (idx >= 0) state.tasks[idx] = task;
   else state.tasks = [task, ...state.tasks];
+  // Reflejo local del cascade del backend cuando se completa una tarea
+  let unblocked = 0;
+  if (task.status === 'Completado') {
+    const nowIso = new Date().toISOString();
+    state.tasks = state.tasks.map(t => {
+      if (t.id !== task.id && t.dependsOnId === task.id && !isTerminal(t.status)) {
+        unblocked++;
+        return { ...t, status: 'Por iniciar', dependsOnId: '', dependsOnTitle: '', waitReason: '', updatedAt: nowIso };
+      }
+      return t;
+    });
+  }
   render(); saveCache();
   try {
     const saved = await api('saveTask', { task });
     const i = state.tasks.findIndex(x => x.id === saved.id);
     if (i >= 0) state.tasks[i] = normalizeTask(saved);
     saveCache(); render();
+    if (unblocked > 0) {
+      setTimeout(() => toast(`▶ ${unblocked} tarea${unblocked > 1 ? 's' : ''} desbloqueada${unblocked > 1 ? 's' : ''}`, 'ok'), 600);
+    }
   } catch (e) {
     state.tasks = prev;
     render(); saveCache();
     toast('Error al guardar: ' + e.message, 'er');
   }
+}
+
+async function unblockTask(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t) return;
+  const updated = { ...t, status: 'En progreso', dependsOnId: '', dependsOnTitle: '', waitReason: '' };
+  await saveTask(updated);
+  toast('▶ Tarea pasada a En progreso', 'ok');
 }
 
 async function deleteTask(id) {
@@ -1334,11 +1418,69 @@ function openModal(t = null) {
   $('#fev').value = t?.evidenceLink || '';
   setToggle('#fevp-toggle', !!t?.evidencePending);
   $('#mdel').style.display = t ? '' : 'none';
+  populateDepSelect(t?.id, '#fdep');
+  setWaitFields(t);
   chkBlocker();
+  chkWait();
   openOverlay('#moverlay');
 }
 
 function chkBlocker() { $('#blkgrp').style.display = $('#fst').value === 'En espera' ? '' : 'none'; }
+function chkWait()    { $('#waitgrp').style.display = $('#fst').value === 'En espera' ? '' : 'none'; }
+
+function populateDepSelect(currentId, selector) {
+  const sel = $(selector);
+  if (!sel) return;
+  const tasks = (state.tasks || []).filter(t => t.id !== currentId && !isTerminal(t.status));
+  const byProj = {};
+  tasks.forEach(t => {
+    const p = t.project || '(sin proyecto)';
+    if (!byProj[p]) byProj[p] = [];
+    byProj[p].push(t);
+  });
+  const projects = Object.keys(byProj).sort();
+  let html = '<option value="">— Seleccionar actividad —</option>';
+  projects.forEach(p => {
+    html += `<optgroup label="${esc(p)}">`;
+    byProj[p].sort((a,b) => (a.title || '').localeCompare(b.title || '')).forEach(t => {
+      html += `<option value="${esc(t.id)}" data-title="${esc(t.title || '')}">${esc(t.title || '(sin título)')}</option>`;
+    });
+    html += '</optgroup>';
+  });
+  sel.innerHTML = html;
+}
+
+function setWaitFields(t) {
+  // Reset
+  document.querySelectorAll('input[name="wait-kind"]').forEach(r => {
+    r.checked = false;
+    r.closest('.wait-opt').classList.remove('on');
+  });
+  $('#fdep').value = '';
+  $('#fwr').value  = '';
+  const hasDep    = t && t.dependsOnId;
+  const hasReason = t && t.waitReason;
+  if (hasDep) {
+    const r = document.querySelector('input[name="wait-kind"][value="task"]');
+    if (r) { r.checked = true; r.closest('.wait-opt').classList.add('on'); }
+    $('#fdep').value = t.dependsOnId;
+    $('#fwr').value  = t.waitReason || '';
+  } else if (hasReason) {
+    const r = document.querySelector('input[name="wait-kind"][value="external"]');
+    if (r) { r.checked = true; r.closest('.wait-opt').classList.add('on'); }
+    $('#fwr').value = t.waitReason;
+  }
+  updateWaitPanels();
+}
+
+function updateWaitPanels() {
+  const k = (document.querySelector('input[name="wait-kind"]:checked') || {}).value || '';
+  $('#wdep-wrap').style.display    = k === 'task' ? '' : 'none';
+  $('#wreason-wrap').style.display = k ? '' : 'none';
+  // Marcar required visualmente sólo en externa
+  const req = $('#wreason-req');
+  if (req) req.style.display = k === 'external' ? '' : 'none';
+}
 function setToggle(sel, on) {
   const el = $(sel);
   el.classList.toggle('on', on);
@@ -1365,12 +1507,61 @@ async function saveModal() {
   }
 
   const task = collectModalTask(title, existing);
+
+  // En espera sin razón llenada → forzar selección en modal secundario
+  if (status === 'En espera' && !task.dependsOnId && !String(task.waitReason || '').trim()) {
+    state.waitFor = { taskId: state.editId, pendingTask: task };
+    $('#a-task').textContent = title;
+    populateDepSelect(state.editId, '#a-dep');
+    document.querySelectorAll('input[name="a-kind"]').forEach(r => {
+      r.checked = false;
+      r.closest('.wait-opt').classList.remove('on');
+    });
+    $('#a-dep').value = '';
+    $('#a-reason').value = '';
+    $('#a-task-wrap').style.display = 'none';
+    $('#a-reason-wrap').style.display = 'none';
+    openOverlay('#aoverlay');
+    return;
+  }
+
   closeOverlay('#moverlay');
   await saveTask(task);
   toast(state.editId ? 'Tarea actualizada' : 'Tarea creada', 'ok');
 }
 
 function collectModalTask(title, existing) {
+  const status = $('#fst').value;
+  const isWait = status === 'En espera';
+  const kind = (document.querySelector('input[name="wait-kind"]:checked') || {}).value || '';
+  let dependsOnId = '';
+  let dependsOnTitle = '';
+  let waitReason = '';
+  if (isWait) {
+    if (kind === 'task') {
+      const sel = $('#fdep');
+      dependsOnId = sel.value || '';
+      const opt = sel.options[sel.selectedIndex];
+      dependsOnTitle = opt && opt.dataset ? (opt.dataset.title || '') : '';
+      if (dependsOnId && !dependsOnTitle) {
+        const dep = state.tasks.find(x => x.id === dependsOnId);
+        if (dep) dependsOnTitle = dep.title || '';
+      }
+      waitReason = $('#fwr').value.trim();
+    } else if (kind === 'external') {
+      waitReason = $('#fwr').value.trim();
+    } else {
+      // Sin selección — preservar lo que tuviera la tarea
+      dependsOnId    = existing?.dependsOnId    || '';
+      dependsOnTitle = existing?.dependsOnTitle || '';
+      waitReason     = existing?.waitReason     || '';
+    }
+  } else {
+    // No está en espera — limpiar los campos para no dejar info colgada
+    dependsOnId = '';
+    dependsOnTitle = '';
+    waitReason = '';
+  }
   return {
     id:              state.editId || uid(),
     title,
@@ -1378,13 +1569,16 @@ function collectModalTask(title, existing) {
     project:         $('#fp').value,
     priority:        $('#fpr').value,
     tool:            $('#fto').value,
-    status:          $('#fst').value,
-    blocker:         $('#fst').value === 'En espera' ? $('#fbl').value : '',
+    status,
+    blocker:         isWait ? $('#fbl').value : '',
     startDate:       $('#fsi').value,
     dueDate:         $('#fdu').value,
     evidenceLink:    $('#fev').value.trim(),
     evidencePending: $('#fevp-toggle').dataset.on === '1',
     justificante:    existing?.justificante || '',
+    waitReason,
+    dependsOnId,
+    dependsOnTitle,
     completedAt:     existing?.completedAt || '',
     cancelledAt:     existing?.cancelledAt || '',
     createdAt:       existing?.createdAt || new Date().toISOString(),
@@ -1410,6 +1604,46 @@ async function confirmCancel() {
   state.cancelFor = null;
   await saveTask(task);
   toast('Tarea cancelada', 'ok');
+}
+
+// =====================================================
+// WAIT KIND MODAL (forzar elección si guardó sin razón)
+// =====================================================
+function updateAWaitPanels() {
+  const k = (document.querySelector('input[name="a-kind"]:checked') || {}).value || '';
+  $('#a-task-wrap').style.display   = k === 'task'     ? '' : 'none';
+  $('#a-reason-wrap').style.display = k ? '' : 'none';
+  const req = $('#a-reason-req');
+  if (req) req.style.display = k === 'external' ? '' : 'none';
+}
+
+async function confirmWaitKind() {
+  if (!state.waitFor) return;
+  const kindRadio = document.querySelector('input[name="a-kind"]:checked');
+  if (!kindRadio) { toast('Elegí una opción', 'er'); return; }
+  const kind = kindRadio.value;
+  const pending = state.waitFor.pendingTask;
+  if (kind === 'task') {
+    const sel = $('#a-dep');
+    const id = sel.value;
+    if (!id) { toast('Elegí una actividad', 'er'); return; }
+    const opt = sel.options[sel.selectedIndex];
+    pending.dependsOnId    = id;
+    pending.dependsOnTitle = (opt && opt.dataset && opt.dataset.title) || (opt ? opt.textContent : '') || '';
+    pending.waitReason     = $('#a-reason').value.trim();
+  } else {
+    const reason = $('#a-reason').value.trim();
+    if (!reason) { toast('Falta el justificante', 'er'); return; }
+    pending.dependsOnId    = '';
+    pending.dependsOnTitle = '';
+    pending.waitReason     = reason;
+  }
+  closeOverlay('#aoverlay');
+  closeOverlay('#moverlay');
+  const wasNew = !state.editId;
+  state.waitFor = null;
+  await saveTask(pending);
+  toast(wasNew ? 'Tarea creada' : 'Tarea actualizada', 'ok');
 }
 
 // =====================================================
@@ -1643,8 +1877,20 @@ $('#fab').addEventListener('click', () => openModal());
 $('#mclose').addEventListener('click', () => closeOverlay('#moverlay'));
 $('#mcan').addEventListener('click', () => closeOverlay('#moverlay'));
 $('#msave').addEventListener('click', saveModal);
-$('#fst').addEventListener('change', chkBlocker);
+$('#fst').addEventListener('change', () => { chkBlocker(); chkWait(); });
 $('#fevp-toggle').addEventListener('click', () => setToggle('#fevp-toggle', $('#fevp-toggle').dataset.on !== '1'));
+document.querySelectorAll('input[name="wait-kind"]').forEach(r => {
+  r.addEventListener('change', () => {
+    document.querySelectorAll('input[name="wait-kind"]').forEach(rr => rr.closest('.wait-opt').classList.toggle('on', rr.checked));
+    updateWaitPanels();
+  });
+});
+document.querySelectorAll('input[name="a-kind"]').forEach(r => {
+  r.addEventListener('change', () => {
+    document.querySelectorAll('input[name="a-kind"]').forEach(rr => rr.closest('.wait-opt').classList.toggle('on', rr.checked));
+    updateAWaitPanels();
+  });
+});
 $('#moverlay').addEventListener('click', e => { if (e.target === $('#moverlay')) closeOverlay('#moverlay'); });
 $('#mdel').addEventListener('click', async () => {
   if (!state.editId) return;
@@ -1659,6 +1905,11 @@ $('#cclose').addEventListener('click', () => { state.cancelFor = null; closeOver
 $('#c-back').addEventListener('click', () => { state.cancelFor = null; closeOverlay('#coverlay'); });
 $('#c-save').addEventListener('click', confirmCancel);
 $('#coverlay').addEventListener('click', e => { if (e.target === $('#coverlay')) { state.cancelFor = null; closeOverlay('#coverlay'); } });
+
+$('#aclose').addEventListener('click', () => { state.waitFor = null; closeOverlay('#aoverlay'); });
+$('#a-back').addEventListener('click', () => { state.waitFor = null; closeOverlay('#aoverlay'); });
+$('#a-save').addEventListener('click', confirmWaitKind);
+$('#aoverlay').addEventListener('click', e => { if (e.target === $('#aoverlay')) { state.waitFor = null; closeOverlay('#aoverlay'); } });
 
 $('#zclose').addEventListener('click', () => { state.closingFor = null; closeOverlay('#zoverlay'); });
 $('#z-no').addEventListener('click', closingNo);
